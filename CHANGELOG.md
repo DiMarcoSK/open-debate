@@ -13,6 +13,9 @@
 
 - Panel triggers match English and Portuguese words, and negations in both languages.
 - Case slugs drop accents (`Gestão de clínicas` becomes `gestao-de-clinicas`).
+- `open-debate status` with no case lists every case under `./cases` with its next phase.
+- `run` refuses a pre-0.5 case with Portuguese headings and points to `--from research`; `status` warns about it.
+- The TOKENS gate accepts short hex (`#FFF`) and the backlog gate accepts lowercase estimates (`est m`).
 - Model cost profiles on opencode: `open-debate models profile free|mixed|strong [provider/model]`. `mixed` puts the strong model only on the orchestrator, judge, auditor and architecture seats.
 - `open-debate upgrade [--check]` and a daily new-version notice. CI moves the `stable` tag on every green push to `main`; `install.sh` pins the downloaded commit.
 - Grill intake: rounds of up to 3 questions per theme that challenge vague answers, contradictions and scope, plus a second grill after the agenda for preference-only decisions.

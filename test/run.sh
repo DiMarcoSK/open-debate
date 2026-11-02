@@ -524,6 +524,28 @@ retoma_status() {
   grep -q '^next: specs$' "$WORK/s"
   grep -q '^cost: ' "$WORK/s"
 }
+status_lista() {
+  cd "$WORK"; rm -rf cases
+  "$CLI" new "first idea" cases > /dev/null; "$CLI" new "second idea" cases > /dev/null
+  "$CLI" status > "$WORK/s"
+  grep -q '^cases/first-idea  *brief$' "$WORK/s"
+  grep -q '^cases/second-idea  *brief$' "$WORK/s"
+  rm -rf cases; nao "$CLI" status > /dev/null 2>&1
+}
+caso_legado() {
+  c="$(novo_caso)"; mv "$c/debate-rules.md" "$c/regras-debate.md"
+  "$CLI" status "$c" | grep -q 'before open-debate 0.5'
+  nao env SPECS=0 MODEL=stub/modelo "$CLI" run "$c" 1 > "$WORK/x" 2>&1
+  grep -q -- '--from research' "$WORK/x"
+  SPECS=0 MODEL=stub/modelo "$CLI" run "$c" 1 --from research
+  existe "$c/debate-rules.md"; ausente "$c/regras-debate.md"
+}
+parse_tolerante() {
+  c="$(novo_caso)"; sed 's/^on-accent #FFFFFF/on-accent #FFF/' "$FX/proposal-ux.md" > "$c/proposals/debate-ux.md"
+  "$CLI" gate "$c" proposal debate-ux
+  sed 's/est S,/est s,/g; s/est M,/est m,/g' "$FX/BACKLOG.md" > "$c/BACKLOG.md"
+  "$CLI" gate "$c" backlog
+}
 defasagem() {
   c="$(novo_caso)"
   SPECS=0 MODEL=stub/modelo "$CLI" run "$c" 1
@@ -661,6 +683,9 @@ tp "audit with a defect fixes once" auditoria_corrige
 tp "approved audit does not re-emit the SDD" auditoria_aprova_sem_reemitir
 tp "old case with proposals goes on without an agenda" agenda_pulada_em_caso_antigo
 tp "status shows the next phase" retoma_status
+tp "status without a case lists every case" status_lista
+tp "legacy Portuguese case is refused until --from research" caso_legado
+tp "TOKENS accept short hex and the backlog lowercase estimates" parse_tolerante
 tp "every task asks for the content as the answer, in English" tarefa_pede_texto
 tp "[assumed] in backticks is not an assumption" assumido_citado
 tp "edited input raises a warning" defasagem

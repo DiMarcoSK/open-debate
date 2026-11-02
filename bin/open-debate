@@ -38,7 +38,7 @@ Cases:
   open-debate run <case> [options]          runs the whole protocol, up to the backlog
   open-debate specs <case> <slug> [slug...] creates specs/<nn>-<slug>/ by hand
   open-debate panel <case> [--save] [a,b]   shows the panel the brief triggers and why
-  open-debate status <case>                 shows each phase, the next one, stale outputs and cost
+  open-debate status [case]                 shows each phase, the next one, stale outputs and cost; no case lists them all
   open-debate gate <case> <phase> [agent...] runs the gate of 1 phase
   open-debate validate <case> [--brief]     runs every gate of the case
   open-debate backlog <case>                exports CSV, JSON and a gh script
@@ -229,7 +229,16 @@ case "$cmd" in
   new) need_args "$#" 1; run_script new-debate.sh "$@" ;;
   run) need_args "$#" 1; cmd_run "$@" ;;
   specs) need_args "$#" 2; run_script make-specs.sh "$@" ;;
-  status) need_args "$#" 1; run_script status.sh "$@" ;;
+  status)
+    # Without a case: 1 line per case under ./cases with its next phase.
+    if [ "$#" -eq 0 ]; then
+      n=0
+      for c in cases/*/; do
+        [ -f "${c}brief.md" ] || continue
+        n=$((n + 1)); printf '%-40s %s\n' "${c%/}" "$("$PKG_SCRIPTS/status.sh" "${c%/}" 2>/dev/null | sed -n 's/^next: //p')"
+      done
+      [ "$n" -gt 0 ] || { echo "no case under ./cases; create one with: open-debate new \"<idea>\"" >&2; exit 2; }
+    else run_script status.sh "$@"; fi ;;
   panel) need_args "$#" 1; c="$1"; shift; run_script panel.sh "$c" $(for x in "$@"; do csv "$x"; printf ' '; done) ;;
   gate) need_args "$#" 2; run_script gate.sh "$@" ;;
   validate) need_args "$#" 1; run_script validate.sh "$@" ;;

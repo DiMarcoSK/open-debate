@@ -15,6 +15,8 @@ function pair(a, b, m, optional,  r, ok) {
   if (!ok) fail = 1
 }
 function ishex(w) { return w ~ /^#[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]$/ }
+# Short hex (#FFF) is common in model output: expand it instead of failing the gate on a missing color.
+function long(w) { return w ~ /^#[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]$/ ? "#" substr(w, 2, 1) substr(w, 2, 1) substr(w, 3, 1) substr(w, 3, 1) substr(w, 4, 1) substr(w, 4, 1) : w }
 state == 0 && /^[[:space:]`>*#|-]*TOKENS[[:space:]`*|:]*$/ { state = 1; found = 1; next }
 state == 1 && /^[[:space:]`>*#|-]*END[[:space:]`*|]*$/ { state = 2; next }
 state == 1 {
@@ -22,7 +24,7 @@ state == 1 {
   if (l == "") next
   n = split(l, w, /[[:space:]]+/); hashex = 0
   for (i = 2; i <= n; i++) {
-    x = w[i]; sub(/[,;.]$/, "", x)
+    x = w[i]; sub(/[,;.]$/, "", x); x = long(x)
     if (ishex(x)) { k = tolower(w[i - 1]); sub(/:$/, "", k); t[k] = toupper(x); hashex = 1 }
   }
   if (hashex) next

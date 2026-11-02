@@ -56,6 +56,10 @@ case_panel() {
   printf '%s' "$pc"
 }
 skipped() { grep -q '^skipped' "$1" 2>/dev/null; }
+# legacy_case <case>: created before 0.5, with Portuguese templates and headings that the English gates do not read.
+legacy_case() { [ -f "$1/regras-debate.md" ] && [ ! -f "$1/debate-rules.md" ]; }
+LEGACY_HINT="case created before open-debate 0.5 (Portuguese headings): rerun it with --from research (FROM=research) to redo it in English"
+
 
 tokens_ok() {
   r="$(awk -v mode=contrast -f "$TOK" "$1" 2>&1)" && return 0

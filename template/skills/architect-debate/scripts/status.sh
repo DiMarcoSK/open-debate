@@ -8,6 +8,7 @@ TOK="$SCRIPT_DIR/tokens.awk"
 . "$SCRIPT_DIR/gates.sh"
 [ -f "$CASE_DIR/brief.md" ] || { echo "error: $CASE_DIR is not a case" >&2; exit 2; }
 PANEL="${PANEL:-$(case_panel "$CASE_DIR")}"
+if legacy_case "$CASE_DIR"; then echo "warning: $LEGACY_HINT"; fi
 NEXT=""
 row() {
   printf '%-10s %s\n' "$1" "$2"

@@ -41,7 +41,7 @@ function path(id,  n, i, d, v, best, ds) {
   for (i = 1; i <= m; i++) {
     if (w[i] == "") continue
     if (w[i] ~ /^E[0-9]+$/) { ep[id] = w[i]; indep = 0 }
-    else if (w[i] == "est") { est[id] = w[i + 1]; i++; indep = 0 }
+    else if (tolower(w[i]) == "est") { est[id] = toupper(w[i + 1]); i++; indep = 0 }
     else if (w[i] == "dep") indep = 1
     else if (w[i] ~ /^#/) { tg[id] = tg[id] " " substr(w[i], 2); used[substr(w[i], 2)] = 1; indep = 0 }
     else if (indep && w[i] ~ /^B[0-9]+$/) dep[id] = dep[id] " " w[i]

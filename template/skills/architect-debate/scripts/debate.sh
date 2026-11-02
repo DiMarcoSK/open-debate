@@ -65,6 +65,11 @@ PHASES="research agenda proposal critique factcheck rebuttal decision sdd brand 
 if [ -n "$FROM" ]; then
   case " $PHASES " in *" $FROM "*) ;; *) echo "error: invalid --from: $FROM ($PHASES)" >&2; exit 2 ;; esac
 fi
+# A legacy case resumed as is would fail every gate on its Portuguese headings; redone from research it works.
+if legacy_case "$CASE_DIR"; then
+  [ "$FROM" = "research" ] || { echo "error: $LEGACY_HINT" >&2; exit 2; }
+  rm -f "$CASE_DIR/regras-debate.md"
+fi
 
 # Mix: 1 harness at a time around the panel. Explicit ROUTES win.
 if [ -n "$MIX" ]; then
