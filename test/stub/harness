@@ -2,28 +2,44 @@
 # Stub dos harnesses: o nome do link escolhe o formato de saida real daquele CLI. Sem rede e sem LLM.
 set -eu
 self="$0"
-FX="$(CDPATH= cd -- "$(dirname -- "$(readlink "$self" 2>/dev/null || echo "$self")")/../fixtures" && pwd)"
-nome="$(basename "$self")"; [ "$nome" != "harness" ] || { nome="$1"; shift; }
-[ -z "${STUB_LOG:-}" ] || printf '%s %s\n' "$nome" "$(printf '%s' "$*" | tr '\n' ' ' | cut -c1-2000)" >> "$STUB_LOG"
+# So builtins onde da: cada processo a menos conta, o stub roda em toda chamada simulada da suite.
+real="$self"; [ ! -L "$self" ] || real="$(readlink "$self")"
+case "$real" in /*) ;; *) real="${self%/*}/$real" ;; esac
+FX="${real%/*}/../fixtures"
+nome="${self##*/}"; [ "$nome" != "harness" ] || { nome="$1"; shift; }
+[ -z "${STUB_LOG:-}" ] || { l_="$(printf '%s' "$*" | tr '\n' ' ')"; printf '%s %.2000s\n' "$nome" "$l_" >> "$STUB_LOG"; }
 fim=""; p=""
 while [ "$#" -gt 0 ]; do
   case "$1" in -o) if [ "$nome" = "codex" ]; then fim="$2"; fi ;; esac
   case "$1" in *"## Tarefa"*|"Responda"*) p="$1" ;; esac
   shift
 done
-tarefa="$(printf '%s\n' "$p" | awk 'f { print } /^## Tarefa/ { f = 1 }' | sed '/^$/d' | head -1)"
+# Tarefa: 1a linha nao vazia depois de "## Tarefa". Papel: 1a linha "You are the ..." da persona.
+tarefa=""; agente=""; depois=0
+while IFS= read -r l; do
+  case "$l" in "You are the "*) [ -n "$agente" ] || agente="$l" ;; esac
+  if [ "$depois" = 1 ] && [ -n "$l" ] && [ -z "$tarefa" ]; then tarefa="$l"; fi
+  case "$l" in "## Tarefa"*) depois=1 ;; esac
+done <<EOF_P
+$p
+EOF_P
 [ -n "$tarefa" ] || tarefa="$p"
-agente="$(printf '%s\n' "$p" | grep -ioE 'principal product designer|lead software architect|security and privacy engineer|gcp|kubernetes' | head -1 | tr '[:upper:]' '[:lower:]')"
-case "$agente" in *designer*) short=design ;; *kubernetes*) short=k8s ;; *security*) short=sec ;; gcp) short=gcp ;; *) short=arch ;; esac
+case "$agente" in
+  *"software product designer"*) short=design ;; *"UI and UX"*) short=ux ;; *"creative director"*) short=brand ;;
+  *"head of product"*) short=pm ;; *Kubernetes*) short=k8s ;; *security*) short=sec ;; *"GCP "*) short=gcp ;;
+  *"AWS "*) short=aws ;; *"data and analytics"*) short=data ;; *"AI engineer"*) short=ai ;; *mobile*) short=mobile ;;
+  *) short=arch ;;
+esac
 case "$tarefa" in
   "modo pesquisa"*) f=research.md ;;
   "modo fact-check"*) f=research-check.md ;;
   "fase agenda"*) f=agenda.md ;;
   "fase proposta"*) f="proposta-$short.md" ;;
-  "fase ataque"*) f=ataque.md ;;
+  "fase ataque"*) f=ataque.md; [ "$short" = "ux" ] && f=ataque-ux.md ;;
   "fase replica"*) f=replica.md ;;
   "fase decisao"*) f=decision.md ;;
   "fase sdd"*|"fase correcao"*) f=SDD.md ;;
+  "fase marca"*) f=BRANDBOOK.md ;;
   "fase auditoria"*) f="${STUB_AUDITORIA:-auditoria.md}" ;;
   "fase spec"*) f=spec-bundle.md ;;
   "fase backlog-design"*|"fase backlog-eng"*) f=trilha.md ;;
@@ -37,8 +53,8 @@ elif [ "${FAIL_ONCE:-}" = "$f" ] && [ ! -e "$STUB_STATE.$f" ]; then
 else
   texto="$(cat "$FX/$f")"
   # Ataque de verdade mira um rival do painel: o nome sai da propria tarefa.
-  if [ "$f" = "ataque.md" ]; then
-    rival="$(printf '%s' "$tarefa" | grep -Eo 'proposals/debate-[a-z0-9]+' | head -1 | sed 's#proposals/##')"
+  if [ "$f" = "ataque.md" ] || [ "$f" = "ataque-ux.md" ]; then
+    r_="${tarefa#*proposals/debate-}"; rival="debate-${r_%%[!a-z0-9]*}"
     texto="$(printf '%s\n' "$texto" | sed "s/debate-gcp/$rival/g")"
   fi
 fi

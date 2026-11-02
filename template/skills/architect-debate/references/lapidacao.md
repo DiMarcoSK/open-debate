@@ -1,6 +1,6 @@
 # Lapidacao - o que separa "funciona" de "produto lapidado"
 
-Cada tag vira ao menos 1 item no BACKLOG.md (`#tag` no bloco `{...}`); gate.sh reprova tag ausente.
+Cada tag vira ao menos 1 item no BACKLOG.md (`#tag` no bloco `{...}`); gate.sh reprova tag ausente (`marca` so conta quando o caso tem BRANDBOOK.md).
 Basico entra no DoD de todo item (estados, foco, copy real). A fase Lapidacao audita e refina o conjunto.
 
 | Tag | Lapidado quando (criterio medivel) |
@@ -14,6 +14,7 @@ Basico entra no DoD de todo item (estados, foco, copy real). A fase Lapidacao au
 | perf | Core Web Vitals p75: LCP < 2.5 s, INP < 200 ms, CLS < 0.1; orcamento de JS por rota; p95 de API do SDD medido |
 | onboarding | primeira execucao com dado de exemplo; tempo ate o primeiro valor medido e abaixo da meta do SDD |
 | assinatura | momento assinatura do SDD implementado e revisado pelo design |
+| marca | so com BRANDBOOK.md: logo nas versoes, favicon e icone de app; cada tela-chave confere com a secao 7; copy revisada contra a voz da secao 2 |
 | qa-visual | regressao visual por screenshot (Playwright) nas telas-chave; design QA por tela contra style-tile.html |
 | observabilidade | SLO do fluxo principal, metricas RED, log com trace id, alerta com dono |
 | seguranca | mitigacoes STRIDE do SDD, authz testado por papel, segredos em cofre, CSP/HSTS, dependencias escaneadas no CI |

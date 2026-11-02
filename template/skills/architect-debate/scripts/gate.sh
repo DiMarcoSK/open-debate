@@ -1,6 +1,6 @@
 #!/bin/sh
 # gate.sh <caso> <fase> [agent...] - gate de 1 fase para o orquestrador do modo sessao.
-# Fases: brief pesquisa agenda proposta ataque decisao sdd auditoria specs trilhas backlog. Imprime OK/REPROVADO por arquivo, sai 1 se algo reprovou.
+# Fases: brief pesquisa agenda proposta ataque decisao sdd auditoria marca specs trilhas backlog. Imprime OK/REPROVADO por arquivo, sai 1 se algo reprovou.
 # status imprime o estado de cada fase e a proxima; vetados lista quem precisa de replica.
 # decisao aprovada separa os ADRs em adr/; sdd aprovado gera style-tile.html, tokens.json e tokens.css;
 # backlog aprovado exporta backlog.csv, backlog.json e backlog-gh.sh.
@@ -12,8 +12,7 @@ shift 2
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 TOK="$SCRIPT_DIR/tokens.awk"
 . "$SCRIPT_DIR/gates.sh"
-PAINEL="${*:-$(sed -n 's/^painel: //p' "$CASE_DIR/meta.txt" 2>/dev/null | tail -1)}"
-PAINEL="${PAINEL:-debate-arch debate-design debate-gcp debate-k8s}"
+PAINEL="${*:-$(painel_do_caso "$CASE_DIR")}"
 FAIL=0
 um() {
   r="$(check "$1" "$2" "$3")"
@@ -33,10 +32,11 @@ case "$FASE" in
     um sdd debate-judge "$CASE_DIR/SDD.md"
     [ "$FAIL" -eq 0 ] && "$SCRIPT_DIR/style-tile.sh" "$CASE_DIR" ;;
   auditoria) um auditoria debate-auditor "$CASE_DIR/auditoria.md" ;;
+  marca) um marca debate-brand "$CASE_DIR/BRANDBOOK.md" ;;
   specs) "$SCRIPT_DIR/validate.sh" "$CASE_DIR" || FAIL=1 ;;
   vetados) vetados "$CASE_DIR"; echo ;;
   status) exec "$SCRIPT_DIR/status.sh" "$CASE_DIR" ;;
-  trilhas) um trilha debate-design "$CASE_DIR/backlog/design.md"; um trilha debate-arch "$CASE_DIR/backlog/eng.md" ;;
+  trilhas) um trilha debate-ux "$CASE_DIR/backlog/design.md"; um trilha debate-arch "$CASE_DIR/backlog/eng.md" ;;
   backlog)
     um backlog debate-pm "$CASE_DIR/BACKLOG.md"
     [ "$FAIL" -eq 0 ] && "$SCRIPT_DIR/backlog-export.sh" "$CASE_DIR" ;;

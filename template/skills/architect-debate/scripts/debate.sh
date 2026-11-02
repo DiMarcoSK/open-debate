@@ -6,7 +6,8 @@
 # Env: HARNESS=opencode, MODEL (vazio = padrao do harness), MODEL_FALLBACK (1x em auth ou limite), RETRIES=2, TIMEOUT=600, MIN_LINES=5,
 #      BACKOFF=20 (s, dobra a cada espera), PARALELO=6 (chamadas simultaneas, 0 = sem teto), MAX_CHAMADAS=0 (teto do run, 0 = sem teto),
 #      FROM=<fase> (arquiva essa fase e as seguintes em raw/arquivo e refaz),
-#      FRESH=0, AGENDA=1, REVIEW=1, RESEARCH=1, FACTCHECK=1, SPECS=1, REPAIR=1, PAINEL="debate-arch debate-design debate-gcp debate-k8s",
+#      FRESH=0, AGENDA=1, REVIEW=1, RESEARCH=1, FACTCHECK=1, SPECS=1, REPAIR=1,
+#      PAINEL="debate-arch debate-ux debate-pm debate-design" (vazio = meta.txt ou escolhido pelo brief; debate-arch, debate-ux e debate-pm sempre entram),
 #      MESA="claude codex" (painel distribuido entre harnesses), ROTAS="debate-arch=claude debate-design=codex:gpt-5" (rota por agent),
 #      HARNESS_CMD (HARNESS=custom: comando que le $PROMPT e $MODEL e imprime a resposta).
 set -eu
@@ -33,14 +34,18 @@ SPECS="${SPECS:-1}"
 HARNESS="${HARNESS:-opencode}"
 MESA="${MESA:-}"
 ROTAS="${ROTAS:-}"
-[ -n "${PAINEL:-}" ] || PAINEL="$(sed -n 's/^painel: //p' "$CASE_DIR/meta.txt" 2>/dev/null | tail -1)"
-PAINEL="${PAINEL:-debate-arch debate-design debate-gcp debate-k8s}"
 
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 REF="$SCRIPT_DIR/../references"
 TOK="$SCRIPT_DIR/tokens.awk"
 . "$SCRIPT_DIR/gates.sh"
 . "$SCRIPT_DIR/harness.sh"
+
+# Painel: o pedido, o gravado no caso ou o que o brief aciona em painel.conf. Os assentos base entram sempre.
+AUTO=0; [ -n "${PAINEL:-}" ] || grep -q '^painel: ' "$CASE_DIR/meta.txt" 2>/dev/null || AUTO=1
+PEDIDO="${PAINEL:-$(painel_do_caso "$CASE_DIR")}"
+PAINEL="$(com_base "$PEDIDO")"
+SOMADOS=""; for b in $PAINEL_BASE; do case " $PEDIDO " in *" $b "*) ;; *) SOMADOS="$SOMADOS $b" ;; esac; done
 
 case "$ROUNDS" in ''|*[!0-9]*) ROUNDS=3;; esac
 [ "$ROUNDS" -gt 3 ] && ROUNDS=3
@@ -55,8 +60,8 @@ n=0; for a in $PAINEL; do
   [ -f "$SCRIPT_DIR/../personas/$a.md" ] || { echo "erro: persona inexistente no painel: $a" >&2; exit 2; }
 done
 [ "$n" -ge 2 ] || { echo "erro: PAINEL precisa de 2+ agents" >&2; exit 2; }
-case "$FROM" in ''|pesquisa|agenda|proposta|ataque|factcheck|replica|decisao|sdd|specs|backlog) ;;
-  *) echo "erro: --from invalido: $FROM (pesquisa agenda proposta ataque factcheck replica decisao sdd specs backlog)" >&2; exit 2 ;;
+case "$FROM" in ''|pesquisa|agenda|proposta|ataque|factcheck|replica|decisao|sdd|marca|specs|backlog) ;;
+  *) echo "erro: --from invalido: $FROM (pesquisa agenda proposta ataque factcheck replica decisao sdd marca specs backlog)" >&2; exit 2 ;;
 esac
 
 # Mesa: 1 harness por vez ao redor do painel. ROTAS explicitas vencem.
@@ -126,7 +131,7 @@ trap interrompe INT TERM
 # arquiva_desde <fase>: move a fase e as seguintes para raw/arquivo/<data>. Nada se apaga, spec editada fica la.
 arquiva_desde() {
   a_dest="$OUT/raw/arquivo/$(date -u +%Y%m%dT%H%M%SZ)"; a_on=0
-  for g in pesquisa agenda proposta ataque factcheck replica decisao sdd specs backlog; do
+  for g in pesquisa agenda proposta ataque factcheck replica decisao sdd marca specs backlog; do
     [ "$g" = "$1" ] && a_on=1
     [ "$a_on" = "1" ] || continue
     case "$g" in
@@ -138,12 +143,13 @@ arquiva_desde() {
       replica) l="$(cd "$OUT" && ls proposals/*-r2.md 2>/dev/null || true)" ;;
       decisao) l="decision.md adr" ;;
       sdd) l="SDD.md auditoria.md style-tile.html tokens.json tokens.css" ;;
+      marca) l="BRANDBOOK.md" ;;
       specs) l="specs checklists" ;;
       backlog) l="backlog BACKLOG.md backlog.csv backlog.json backlog-gh.sh" ;;
     esac
     for x in $l; do
       [ -e "$OUT/$x" ] || continue
-      mkdir -p "$a_dest/$(dirname "$x")"; mv "$OUT/$x" "$a_dest/$x"
+      mkdir -p "$a_dest/$(pai "$x")"; mv "$OUT/$x" "$a_dest/$x"
     done
   done
   printf 'arquivado em %s, refazendo desde %s\n' "${a_dest#"$OUT"/}" "$1" | tee -a "$SUMMARY"
@@ -151,7 +157,7 @@ arquiva_desde() {
 [ -z "$FROM" ] || arquiva_desde "$FROM"
 
 mkdir -p "$OUT/proposals" "$OUT/critiques" "$OUT/adr"
-for t in regras-debate.md visual-contract.md research-template.md agenda-template.md adr-template.md backlog-template.md lapidacao.md sdd-template.md spec-template.md plan-template.md tasks-template.md auditoria-template.md; do
+for t in regras-debate.md visual-contract.md research-template.md agenda-template.md adr-template.md backlog-template.md lapidacao.md sdd-template.md spec-template.md plan-template.md tasks-template.md auditoria-template.md brandbook-template.md; do
   [ -f "$OUT/$t" ] || cp "$REF/$t" "$OUT/$t"
 done
 { grep -v '^painel:\|^harness:\|^rounds:' "$OUT/meta.txt" 2>/dev/null || true; printf 'painel: %s\nharness: %s\nrounds: %s\n' "$PAINEL" "$HARNESS" "$ROUNDS"; } > "$OUT/meta.txt.tmp"
@@ -163,6 +169,12 @@ log() { printf '%s\n' "$*" | tee -a "$SUMMARY"; }
 abort() { log "ABORTA: $*"; exit 1; }
 
 defasados "$OUT" | while IFS= read -r d; do log "aviso: $d; use --from para refazer o que depende dele"; done
+[ -z "$SOMADOS" ] || log "painel: assento base somado:$SOMADOS"
+if [ "$AUTO" = "1" ]; then
+  motivos_painel "$OUT" | while IFS= read -r x; do
+    if no_painel "${x%%:*}"; then log "painel: ${x%%:*} pelo brief (${x#*: })"; fi
+  done
+fi
 dados="$(sed -n 's/^- Dados sensiveis[^:]*:[[:space:]]*//p' "$OUT/brief.md" | tr '[:upper:]' '[:lower:]')"
 if ! printf '%s' " $PAINEL " | grep -q ' debate-sec ' && printf '%s' "$dados" | grep -Eq 'lgpd|gdpr|pci|hipaa|saude|pessoa|cpf|financ' && ! printf '%s' "$dados" | grep -Eq '^(nao|nenhum|sem) '; then
   log "aviso: brief com dado regulado e painel sem debate-sec; considere --painel arch,design,sec"
@@ -224,7 +236,8 @@ tenta_agent() {
 agente() {
   t0="$(date +%s)"; rc2=0; tentativas=0
   tenta_agent "$@" || rc2=$?
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$(basename "$4" .json)" "$1" "$(($(date +%s) - t0))" "$tentativas" "$rc2" "$(rota "$1" | cut -d' ' -f1)" >> "$METRICAS"
+  b4="${4##*/}"; r4="$(rota "$1")"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "${b4%.json}" "$1" "$(($(date +%s) - t0))" "$tentativas" "$rc2" "${r4%% *}" >> "$METRICAS"
   return "$rc2"
 }
 
@@ -289,7 +302,7 @@ sala() {
   sd="$OUT/raw/salas/$1-$(short "$2")"; rm -rf "$sd"; mkdir -p "$sd"
   for x in brief.md constitution.md research.md agenda.md regras-debate.md $l ${3:-}; do
     [ -e "$OUT/$x" ] || continue
-    mkdir -p "$sd/$(dirname "$x")"; cp "$OUT/$x" "$sd/$x"
+    mkdir -p "$sd/$(pai "$x")"; cp "$OUT/$x" "$sd/$x"
   done
   printf '%s' "$sd"
 }
@@ -305,7 +318,7 @@ dest_for() {
 task_for() {
   case "$1" in
     proposta)
-      extra=""; [ "$2" = "debate-design" ] && extra=", visual-contract.md"
+      extra=""; case "$2" in debate-design|debate-ux|debate-brand) extra=", visual-contract.md" ;; esac
       printf 'fase proposta: le brief.md, constitution.md, research.md, agenda.md, regras-debate.md%s; responde so no formato de proposta do teu papel, com a secao Posicoes cobrindo cada Dn de agenda.md' "$extra" ;;
     ataque)
       printf 'fase ataque: le brief.md, research.md, agenda.md, regras-debate.md e as propostas rivais %s; responde so no formato de ataque de regras-debate.md, copiando a citacao literal do arquivo, com arquivo:linha' "$(rivais "$2")" ;;
@@ -457,10 +470,23 @@ fi
 if "$SCRIPT_DIR/style-tile.sh" "$OUT" >> "$SUMMARY" 2>&1; then log "style tile: $OUT/style-tile.html"
 else log "style tile falhou, ver $SUMMARY"; fi
 
+# fase 6d - marca: o diretor de arte fecha o brandbook e adapta as telas do SDD a marca. So com debate-brand no painel.
+if no_painel debate-brand; then
+  le_m="brief.md, SDD.md, decision.md, brandbook-template.md, visual-contract.md"
+  for x in proposals/debate-brand-r2.md proposals/debate-brand.md proposals/debate-design.md critiques/debate-ux.md; do
+    [ -s "$OUT/$x" ] && le_m="$le_m, $x"
+  done
+  T="fase marca: le $le_m; responde so com o BRANDBOOK.md completo"
+  if need "$OUT/BRANDBOOK.md"; then
+    run_agent debate-brand "$T" "$OUT/BRANDBOOK.md" "$OUT/raw/f6-marca.json" || abort "marca"
+  else log "reuso $OUT/BRANDBOOK.md"; fi
+  gate_one marca debate-brand "$OUT/BRANDBOOK.md" "$T" "$OUT/raw/f6-marca.json" || abort "gate marca"
+fi
+
 # fase 7 - specs: 1 chamada por item do indice de decision.md, em paralelo
 spec_pendente() { [ ! -s "$1/spec.md" ] || grep -q '<nn>\|<slug>\|<quem>' "$1/spec.md"; }
 spec_tarefa() {
-  printf 'fase spec: gera spec, plan e tasks da spec %s; le brief.md, SDD.md, decision.md, adr/, visual-contract.md, spec-template.md, plan-template.md e tasks-template.md; responde so com os 3 arquivos, cada um aberto pela linha <!-- arquivo: nome -->' "$(basename "$1")"
+  printf 'fase spec: gera spec, plan e tasks da spec %s; le brief.md, SDD.md, decision.md, adr/, visual-contract.md, spec-template.md, plan-template.md e tasks-template.md; responde so com os 3 arquivos, cada um aberto pela linha <!-- arquivo: nome -->' "${1##*/}"
 }
 spec_separa() {
   awk -v d="$1" '
@@ -474,12 +500,12 @@ if [ "$SPECS" = "1" ]; then
     "$SCRIPT_DIR/make-specs.sh" "$OUT" $slugs >> "$SUMMARY"
   fi
   for d in "$OUT"/specs/[0-9]*/; do
-    d="${d%/}"; b="$(basename "$d")"
+    d="${d%/}"; b="${d##*/}"
     spec_pendente "$d" && launch debate-arch "$(spec_tarefa "$d")" "$OUT/raw/f7-$b.md" "$OUT/raw/f7-$b.json" forca
   done
   wait_all "fase specs" || abort "fase specs"
   for d in "$OUT"/specs/[0-9]*/; do
-    d="${d%/}"; b="$(basename "$d")"
+    d="${d%/}"; b="${d##*/}"
     if spec_pendente "$d" && [ -s "$OUT/raw/f7-$b.md" ]; then spec_separa "$d" "$OUT/raw/f7-$b.md"; fi
     r="$(check spec - "$d")"
     [ -z "$r" ] && continue
@@ -499,10 +525,11 @@ if ls "$OUT"/specs/[0-9]*/spec.md >/dev/null 2>&1 && ! grep -l '<nn>\|<slug>\|<q
 if [ "$SPECS_OK" = "1" ]; then
   mkdir -p "$OUT/backlog"
   LE="le SDD.md, adr/, specs/, lapidacao.md e backlog-template.md"
-  launch debate-design "fase backlog-design: $LE; responde so com o rascunho de itens" "$OUT/backlog/design.md" "$OUT/raw/f8-design.json"
+  BB=""; [ -s "$OUT/BRANDBOOK.md" ] && BB=" e BRANDBOOK.md"
+  launch debate-ux "fase backlog-design: $LE$BB; responde so com o rascunho de itens" "$OUT/backlog/design.md" "$OUT/raw/f8-design.json"
   launch debate-arch "fase backlog-eng: $LE; responde so com o rascunho de itens" "$OUT/backlog/eng.md" "$OUT/raw/f8-eng.json"
   wait_all "fase trilhas" || abort "fase trilhas"
-  T="fase backlog: le brief.md, SDD.md, decision.md, adr/, specs/*/tasks.md, backlog/design.md, backlog/eng.md, lapidacao.md e backlog-template.md; responde so com o BACKLOG.md"
+  T="fase backlog: le brief.md, SDD.md, decision.md, adr/, specs/*/tasks.md, backlog/design.md, backlog/eng.md$BB, lapidacao.md e backlog-template.md; responde so com o BACKLOG.md"
   if need "$OUT/BACKLOG.md"; then run_agent debate-pm "$T" "$OUT/BACKLOG.md" "$OUT/raw/f8-backlog.json" || abort "pm backlog"; else log "reuso $OUT/BACKLOG.md"; fi
   gate_one backlog debate-pm "$OUT/BACKLOG.md" "$T" "$OUT/raw/f8-backlog.json" || abort "gate backlog"
   "$SCRIPT_DIR/backlog-export.sh" "$OUT" | tee -a "$SUMMARY"
@@ -515,6 +542,6 @@ metricas() {
     END { printf "tempo: %d s neste run; historico do caso: %d chamadas, %d s de modelo, %d reparo(s), %d retentativa(s); a mais lenta foi %s (%d s)\n", parede, n, s, rep, ret, q, m }' "$METRICAS"
 }
 log "$(metricas)"
-log "debate ok: decision.md, adr/, SDD.md, style-tile.html em $OUT"
+log "debate ok: decision.md, adr/, SDD.md, style-tile.html$([ -s "$OUT/BRANDBOOK.md" ] && printf ', BRANDBOOK.md') em $OUT"
 if [ "$SPECS_OK" = "1" ]; then log "backlog ok: BACKLOG.md, backlog.csv, backlog.json, backlog-gh.sh"
 else log "proximo: preencher as specs (make-specs.sh, com SPECS=0) e rodar debate.sh de novo para a fase 8 (backlog)"; fi

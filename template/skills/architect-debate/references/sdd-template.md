@@ -28,7 +28,9 @@ Cada servico com req/dia e custo/mes.
 
 ## 5. Experiencia e direcao visual (gate em visual-contract.md)
 
-JTBD e tarefa critica com meta de passos/segundos. Conceito: <metafora>, convencao mantida e quebrada.
+JTBD e tarefa critica com meta de passos/segundos. Metas de usabilidade e plano WCAG 2.2 AA (debate-ux).
+Fluxos com contagem de passos e inventario de telas (debate-design), com os ajustes da revisao de debate-ux aplicados.
+Conceito: <metafora>, convencao mantida e quebrada; com debate-brand no painel, a marca e o BRANDBOOK.md.
 Bloco TOKENS literal com razoes de contraste. Escala de tipo, espaco, raio, elevacao, movimento.
 Telas-chave em wireframe ASCII. Estados escritos: Vazio, Loading, Erro, Sucesso, Parcial.
 Momento assinatura com custo. Lista banida confirmada ausente ou override escrito por item.

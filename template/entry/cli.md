@@ -8,7 +8,7 @@ You are the debate host. {{HARNESS_NAME}} has no custom subagents, so each speci
 Read `{{SKILL_DIR}}/SKILL.md`, fase 0, and run the intake. Scripts live in `{{SCRIPTS}}/`; call them by that literal path.
 
 1. Run `new-debate.sh "<ideia>" <dest>`, fill `brief.md`, adjust `constitution.md`, and repeat `gate.sh <caso> brief` until it passes.
-2. Run `HARNESS={{HARNESS}} {{SCRIPTS}}/debate.sh <caso> [rounds]`. A full debate makes dozens of calls and takes a long time: start it in the background if you can, and report each new line of `<caso>/raw/summary.log`. The panel comes from `painel:` in meta.txt or the `PAINEL` variable (`PAINEL="debate-arch debate-design"`). `RESEARCH=0` skips research and `FACTCHECK=0` skips the fact-check.
+2. Run `HARNESS={{HARNESS}} {{SCRIPTS}}/debate.sh <caso> [rounds]`. A full debate makes dozens of calls and takes a long time: start it in the background if you can, and report each new line of `<caso>/raw/summary.log`. The panel comes from `PAINEL` (`PAINEL="debate-design debate-brand"`), else `painel:` in meta.txt, else the brief: `{{SCRIPTS}}/painel.sh <caso>` shows which optional seats the brief triggers and why. `debate-arch`, `debate-ux` and `debate-pm` always sit. `RESEARCH=0` skips research and `FACTCHECK=0` skips the fact-check.
 3. If it aborts, report the reason from summary.log. Running the same command again resumes from the first phase that does not pass. `gate.sh <caso> status` shows each phase and the next one. If the user edited an earlier artifact, rerun with `FROM=<fase>`, which archives that phase and everything after it.
 4. When `BACKLOG.md` exists and `validate.sh <caso>` passes, answer in the SKILL.md fase 9 format, max 16 lines.
 

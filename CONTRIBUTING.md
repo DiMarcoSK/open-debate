@@ -47,8 +47,8 @@ Agents and `gates.sh` are a contract: gates read words and formats from the temp
 ## Adding a specialist
 
 1. Add `personas/debate-<x>.md` with the same frontmatter. State what it owns, what it does not own, its method and its proposal format, with `Posicoes` first.
-2. Add its line to `modelos.conf`, and to the specialist list in `template/entry/subagents.md`.
-3. Add its role checks and line ceiling to `gates.sh`, a `proposta-<x>.md` fixture, and its name to `test/stub/harness`.
+2. Add its line to `modelos.conf`, to `references/painel.conf` (`base` or `opcional` with its trigger words), and to the specialist list in `template/entry/subagents.md`.
+3. Add its role checks and line ceiling to `gates.sh`, a `proposta-<x>.md` fixture, and the first words of its `You are the ...` line to `test/stub/harness`.
 
 ## Tests
 
@@ -57,4 +57,4 @@ npm test
 open-debate doctor --live    # 1 real call on each installed harness
 ```
 
-`TEMPOS=<file> npm test` records the seconds per test. CI runs on Ubuntu and macOS, with shellcheck. A prompt change can only be validated by a real debate: record the model used and the result in the PR.
+Tests register with `t` (runs in order, for anything that installs or changes the installation, in its own HOME) or `tp` (runs in a parallel pool of `JOBS`, default the CPU count, with its own `WORK` and `STUB_STATE`). Prefer `tp`. Process count drives the suite time, so gates and stubs favor 1 `awk` over a loop of `grep`. `TEMPOS=<file> npm test` records the seconds per test. CI runs on Ubuntu and macOS, with shellcheck. A prompt change can only be validated by a real debate: record the model used and the result in the PR.

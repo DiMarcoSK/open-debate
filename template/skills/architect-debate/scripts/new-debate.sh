@@ -6,7 +6,7 @@ IDEA="${1:?uso: new-debate.sh \"sua ideia\" [dest-cases]}"
 BASE="${2:-cases}"
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 REF="$SCRIPT_DIR/../references"
-TEMPLATES="brief-template.md sdd-template.md constitution-template.md regras-debate.md visual-contract.md research-template.md adr-template.md agenda-template.md auditoria-template.md backlog-template.md lapidacao.md spec-template.md plan-template.md tasks-template.md"
+TEMPLATES="brief-template.md sdd-template.md constitution-template.md regras-debate.md visual-contract.md research-template.md adr-template.md agenda-template.md auditoria-template.md backlog-template.md lapidacao.md spec-template.md plan-template.md tasks-template.md brandbook-template.md"
 for f in $TEMPLATES; do
   [ -f "$REF/$f" ] || { echo "erro: referencia ausente: $REF/$f" >&2; exit 2; }
 done
@@ -25,6 +25,8 @@ mkdir -p "$OUT/proposals" "$OUT/critiques" "$OUT/raw" "$OUT/adr" "$OUT/backlog" 
 printf '# Ideia\n\n%s\n' "$IDEA" > "$OUT/idea.md"
 cp "$REF/brief-template.md" "$OUT/brief.md"
 cp "$REF/constitution-template.md" "$OUT/constitution.md"
-for f in sdd-template.md regras-debate.md visual-contract.md research-template.md agenda-template.md auditoria-template.md adr-template.md backlog-template.md lapidacao.md spec-template.md plan-template.md tasks-template.md; do cp "$REF/$f" "$OUT/$f"; done
-printf 'ideia: %s\ndata: %s\npainel: %s\n' "$IDEA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${PAINEL:-debate-arch debate-design debate-gcp debate-k8s}" > "$OUT/meta.txt"
+for f in sdd-template.md regras-debate.md visual-contract.md research-template.md agenda-template.md auditoria-template.md adr-template.md backlog-template.md lapidacao.md spec-template.md plan-template.md tasks-template.md brandbook-template.md; do cp "$REF/$f" "$OUT/$f"; done
+# Sem PAINEL, o painel sai do brief preenchido (painel.sh), nao daqui: o brief ainda esta vazio.
+printf 'ideia: %s\ndata: %s\n' "$IDEA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$OUT/meta.txt"
+[ -z "${PAINEL:-}" ] || printf 'painel: %s\n' "$PAINEL" >> "$OUT/meta.txt"
 printf '%s\n' "$OUT"

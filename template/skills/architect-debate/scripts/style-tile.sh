@@ -1,6 +1,6 @@
 #!/bin/sh
 # style-tile.sh <case-dir> [fonte.md] - gera <case-dir>/style-tile.html do bloco TOKENS
-# (SDD.md, senao decision.md, senao proposta de design): cores com contraste, escala de tipo, componentes e estados.
+# (SDD.md, senao decision.md, senao proposta de debate-brand ou debate-ux): cores com contraste, escala de tipo, componentes e estados.
 # Exporta tambem tokens.json (W3C DTCG 2025.10) e tokens.css (custom properties).
 set -eu
 export LC_ALL=C
@@ -10,14 +10,22 @@ SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 TOK="$SCRIPT_DIR/tokens.awk"
 
 if [ -z "$SRC" ]; then
-  for c in SDD.md decision.md proposals/debate-design-r2.md proposals/debate-design.md; do
+  for c in SDD.md decision.md proposals/debate-brand-r2.md proposals/debate-brand.md proposals/debate-ux-r2.md proposals/debate-ux.md; do
     if [ -s "$CASE_DIR/$c" ] && awk -v modo=lista -f "$TOK" "$CASE_DIR/$c" >/dev/null 2>&1; then SRC="$CASE_DIR/$c"; break; fi
   done
 fi
 [ -n "$SRC" ] || { echo "erro: nenhum bloco TOKENS em $CASE_DIR" >&2; exit 2; }
 
 LISTA="$(awk -v modo=lista -f "$TOK" "$SRC")"
-get() { printf '%s\n' "$LISTA" | awk -F'\t' -v k="$1" '$1 == k { print $2; exit }'; }
+TAB="$(printf '\t')"
+# get <chave>: so builtins, sem processo por chave.
+get() {
+  while IFS="$TAB" read -r g_k g_v; do
+    if [ "$g_k" = "$1" ]; then printf '%s' "$g_v"; return 0; fi
+  done <<EOF_LISTA
+$LISTA
+EOF_LISTA
+}
 cor() {
   v="$(get "$1")"
   case "$v" in \#[0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F]) printf '%s' "$v" ;; *) printf '%s' "$2" ;; esac

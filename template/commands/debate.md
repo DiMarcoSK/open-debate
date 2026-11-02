@@ -5,6 +5,6 @@ agent: debate
 
 Carrega a skill architect-debate e segue o SKILL.md no modo sessao, sem pular o intake.
 
-Opcoes (opcional): `--painel arch,design,gcp,k8s,sec` `--rounds 1-3` `--sem-pesquisa` `--sem-factcheck`.
+Opcoes (opcional): `--painel design,brand,sec` (arch, ux e pm entram sempre) `--rounds 1-3` `--sem-pesquisa` `--sem-factcheck`.
 
 Ideia a debater: $ARGUMENTS

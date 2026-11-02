@@ -7,8 +7,7 @@ SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 TOK="$SCRIPT_DIR/tokens.awk"
 . "$SCRIPT_DIR/gates.sh"
 [ -f "$CASE_DIR/brief.md" ] || { echo "erro: $CASE_DIR nao e um caso" >&2; exit 2; }
-PAINEL="${PAINEL:-$(sed -n 's/^painel: //p' "$CASE_DIR/meta.txt" 2>/dev/null | tail -1)}"
-PAINEL="${PAINEL:-debate-arch debate-design debate-gcp debate-k8s}"
+PAINEL="${PAINEL:-$(painel_do_caso "$CASE_DIR")}"
 PROX=""
 linha() {
   printf '%-10s %s\n' "$1" "$2"
@@ -41,11 +40,12 @@ if [ -z "$f" ]; then linha replica ok; else linha replica "opcional, falta:$f"; 
 fase1 decisao debate-judge "$CASE_DIR/decision.md"
 fase1 sdd debate-judge "$CASE_DIR/SDD.md"
 if [ -s "$CASE_DIR/auditoria.md" ]; then fase1 auditoria debate-auditor "$CASE_DIR/auditoria.md"; else linha auditoria "opcional, nao rodou"; fi
+if no_painel debate-brand; then fase1 marca debate-brand "$CASE_DIR/BRANDBOOK.md"; fi
 ok=0; tot=0; r=""
 for d in "$CASE_DIR"/specs/[0-9]*/; do
   [ -d "$d" ] || continue
   tot=$((tot + 1)); x="$(check spec - "${d%/}")"
-  if [ -z "$x" ]; then ok=$((ok + 1)); else r="$r $(basename "$d")"; fi
+  if [ -z "$x" ]; then ok=$((ok + 1)); else d="${d%/}"; r="$r ${d##*/}"; fi
 done
 if [ "$tot" -eq 0 ]; then linha specs pendente
 elif [ "$ok" -eq "$tot" ]; then linha specs "ok $ok/$tot"

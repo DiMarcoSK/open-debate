@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.4.0
+
+A panel picked for the idea, with a fixed core and a design trio that hands work to each other.
+
+### Added
+
+- Base seats that always sit: `debate-arch`, `debate-ux` and `debate-pm`. `run` adds any that are missing from `--painel`.
+- `debate-ux`, the UI and UX specialist: usability goals with numbers, WCAG 2.2 AA plan, interaction patterns, UI system and state copy. In the attack phase it reviews every screen of `debate-design` (`## Revisao debate-design`), and the judge treats each `ajustar` as binding.
+- `debate-brand`, the art and creative director: brand platform, voice, logo, color and type as TOKENS. After the SDD, phase 6d writes `BRANDBOOK.md`, with the SDD tokens unchanged and every key screen adapted to the brand. The backlog then covers the new `#marca` tag.
+- Optional seats `debate-ai`, `debate-data`, `debate-mobile` and `debate-aws`, each with its own method, format and role gate.
+- Automatic panel: without `--painel`, the optional seats come from what the brief says (`references/painel.conf`). `open-debate painel <case>` shows the choice and why.
+- `debate-pm` now proposes in the debate (problem, metric, MVP cut, premises, milestones) besides writing the backlog.
+
+### Changed
+
+- `debate-design` is now the software product designer: flows, screen inventory, wireframes and states. Art direction moved to `debate-brand`, and TOKENS belong to `debate-brand`, or to `debate-ux` without a brand seat.
+- The design backlog track is written by `debate-ux`.
+- Test suite about 4x faster (7 min to under 2 on a laptop): tests run in a parallel pool, installer hashes every file in a single process, and gates, style tile and stubs spawn far fewer processes.
+
 ## 0.3.0
 
 Better planning, sharper specialists, gates that verify instead of trusting, and a faster run.

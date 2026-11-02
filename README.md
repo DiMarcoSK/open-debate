@@ -12,7 +12,8 @@ you:  /debate alert triage platform for a small SOC
 
 fase 1 pesquisa: ok, 18 achados
 fase 1b agenda: 5 decisoes em disputa
-fase 2 proposta: 4/4 ok, design reparado (contraste tinta/papel)
+painel: arch, ux, pm + design, brand, sec (pelo brief)
+fase 2 proposta: 6/6 ok, ux reparado (contraste tinta/papel)
 fase 3 ataque: 4/4 ok
 fase 6 decisao: 5 ADRs, 4 specs; auditoria: 1 defeito corrigido
 fase 8 backlog: 42 itens, 61 dias, caminho critico B01 -> B07 -> B19 -> B33
@@ -78,6 +79,7 @@ open-debate init --project                 # current project instead of user lev
 | `decision.md`, `adr/` | Weighted matrix and MADR 4.0 ADRs, with rejected alternatives, dissent and a ruling on every veto |
 | `SDD.md`, `auditoria.md` | Lean arc42 design doc, with C4 in mermaid, capacity, failures and STRIDE, plus its independent audit |
 | `style-tile.html`, `tokens.json`, `tokens.css` | Visual direction with measured WCAG 2.2 contrast, W3C DTCG tokens |
+| `BRANDBOOK.md` | With `debate-brand` on the panel: brand platform, voice, logo, color, type, and every key screen adapted to the brand |
 | `specs/` | `spec.md`, `plan.md` and `tasks.md` per feature, GitHub Spec Kit style, with EARS requirements |
 | `BACKLOG.md`, `backlog.csv`, `backlog.json`, `backlog-gh.sh` | Backlog through launch, with dependencies, estimates and critical path |
 
@@ -96,7 +98,7 @@ open-debate init --project                 # current project instead of user lev
 ### In a session
 
 ```text
-/debate <idea> [--painel arch,design,gcp,k8s,sec] [--rounds 1-3] [--sem-pesquisa] [--sem-factcheck]
+/debate <idea> [--painel design,brand,sec] [--rounds 1-3] [--sem-pesquisa] [--sem-factcheck]
 ```
 
 The agent asks up to 6 intake questions and runs the phases. The case lives in `cases/<slug>/`. Running `/debate` again on an existing case resumes from the first phase that fails its gate.
@@ -175,8 +177,9 @@ flowchart TD
 | 5 rebuttal | vetoed agents | non-blocking |
 | 6 decision and SDD | `debate-judge` | weights total 100, matrix math checks out, every agenda item, veto and wrong claim ruled on, 3+ MADR ADRs, 3-6 specs, dissent; SDD with every ADR, tokens identical to the decision, no placeholders |
 | 6 audit | `debate-auditor` | verdict; defects go back to the judge |
+| 6d brandbook | `debate-brand`, only when on the panel | sections 1-8, tokens identical to the SDD with contrast, logo, voice, every key screen adapted |
 | 7 specs | `debate-arch`, `debate-design` | EARS, cited ADRs exist, every user story has tasks |
-| 8 backlog | `debate-design`, `debate-arch`, `debate-pm` | 15+ items, covers specs, tasks, ADRs and polish, no cycles, capacity math checks out and the plan fits |
+| 8 backlog | `debate-ux`, `debate-arch`, `debate-pm` | 15+ items, covers specs, tasks, ADRs and polish, no cycles, capacity math checks out and the plan fits |
 
 Details in [`protocol.md`](template/skills/architect-debate/references/protocol.md) and the [debate rules](template/skills/architect-debate/references/regras-debate.md).
 
@@ -184,7 +187,19 @@ Details in [`protocol.md`](template/skills/architect-debate/references/protocol.
 
 **Models.** On opencode, `modelos.conf` sets 1 model per agent. The defaults are free models, which come and go from the catalog: run `open-debate models check` before a long debate. On other harnesses, the agent inherits the session model, and you can pin another on its `model` line. Your choice survives `update`.
 
-**Panel.** The default panel is `arch`, `design`, `gcp` and `k8s`, so the infrastructure discussion assumes Google Cloud. Add `sec` when the product handles personal, financial or regulated data: `--painel arch,design,gcp,sec`. For another cloud, create a `debate-aws.md` persona modeled on `debate-gcp.md`, in `template/skills/architect-debate/personas/`, and pass `--painel arch,design,aws`.
+**Panel.** Three seats always sit: `debate-arch` (software architecture), `debate-ux` (UI and UX: usability goals, accessibility, the UI system and a review of every screen) and `debate-pm` (problem, metric, MVP cut, premises; it also writes the backlog). Research and judge always run outside the panel. The other seats join when the brief calls for them, up to 8 in total:
+
+| Seat | Joins when the brief mentions |
+|---|---|
+| `debate-design` | screens: web, app, dashboard, portal. Decides what each screen holds; `debate-ux` reviews it in the attack phase |
+| `debate-brand` | a public face: brand, B2C, consumers, store, launch. Art and creative director: brand identity and tokens, then `BRANDBOOK.md` adapting the designer's screens to the brand |
+| `debate-sec` | personal, financial, health or regulated data |
+| `debate-ai` | LLMs, RAG, agents, ML |
+| `debate-data` | analytics, BI, ETL, pipelines, reports |
+| `debate-mobile` | iOS, Android, offline, push |
+| `debate-gcp`, `debate-aws`, `debate-k8s` | that cloud or a cluster |
+
+`open-debate painel <case>` shows the panel the brief triggers and the word that triggered each seat; `--grava design,brand` records a choice. `--painel design,brand` on `run` picks the seats by hand, and the base seats are added anyway. Triggers live in [`painel.conf`](template/skills/architect-debate/references/painel.conf); the "Fora do escopo" line and negative answers ("nenhum", "nao") never trigger a seat. For another cloud, create a persona modeled on `debate-aws.md` and add it there.
 
 **Principles.** `constitution.md` is copied into each case, and the intake can adjust it. Breaking a principle requires a written override.
 

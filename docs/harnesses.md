@@ -62,7 +62,7 @@ open-debate run <case> --harness claude --mesa claude,codex,gemini
 `--mesa` rotates the panel across the harnesses. `--harness` sets who runs research, judge and backlog. For full control, use routes:
 
 ```sh
-ROTAS="debate-arch=claude debate-design=codex:<model>" open-debate run <case> --harness claude
+ROTAS="debate-arch=claude debate-ux=codex:<model>" open-debate run <case> --harness claude
 ```
 
 On Claude Code, `debate-scout` is installed with `model: haiku` and the other agents inherit the session model. Change that line to pick another one; `update` keeps your choice.

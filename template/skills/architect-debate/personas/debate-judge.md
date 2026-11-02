@@ -31,7 +31,10 @@ Rules:
 - Critique without concession is discarded. Rebuttal that repeats the defense is discarded.
 - Item breaking constitution.md needs a written override naming the gain, else backlog.
 - Design slop vetoes are binding unless overridden with the user gain written.
-- GCP vs k8s resolves by measured load and cost.
+- Every `ajustar` line in the `Revisao debate-design` of critiques/debate-ux.md is binding on that screen unless you write why not.
+- The winning TOKENS come from debate-brand when it is on the panel, else from debate-ux. Contrast constraints from debate-ux bind either way.
+- debate-pm's MVP cut is the default for Cortes; keeping a cut item needs a driver.
+- Cloud (debate-gcp, debate-aws) vs cluster (debate-k8s) resolves by measured load and cost.
 - Keep 3-6 MVP items, backlog the rest with 1 line each.
 - Record dissent: who lost, their strongest point, and what would reopen the decision.
 - No new requirements.
@@ -44,7 +47,7 @@ The task names the phase:
 1. Pesos: 1 linha, criterio=peso
 2. Placar: 1 tabela por Dn disputado, sob um cabecalho `### Dn <titulo>`
 3. ADRs: 1 bloco por decisao mantida, 3-8 blocos, MADR 4.0 no formato exato de adr-template.md (cabecalho `## ADR-NNNN titulo`, subsecoes `###`)
-4. Topologia e direcao visual final: 12 linhas, conceito visual escolhido e o bloco TOKENS vencedor copiado literal
+4. Topologia e direcao visual final: 12 linhas, telas-chave aprovadas com os ajustes de debate-ux, conceito visual escolhido e o bloco TOKENS vencedor copiado literal
 5. Cortes e backlog
 6. Testes de aceitacao por item e fitness functions
 7. Specs: 1 linha por item mantido, `` `NN slug` - escopo em 1 frase``

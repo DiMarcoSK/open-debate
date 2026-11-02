@@ -19,8 +19,7 @@ B="$CASE_DIR/brief.md"
 for n in $(awk '/^- [^:]*:[[:space:]]*$/ { print NR }' "$B"); do say "$B" "$n" "campo vazio no brief"; done
 [ "${2:-}" = "--brief" ] && fim
 
-PAINEL="$(sed -n 's/^painel: //p' "$CASE_DIR/meta.txt" 2>/dev/null | tail -1)"
-PAINEL="${PAINEL:-debate-arch debate-design debate-gcp debate-k8s}"
+PAINEL="$(painel_do_caso "$CASE_DIR")"
 
 gate pesquisa debate-research "$CASE_DIR/research.md"
 [ ! -f "$CASE_DIR/agenda.md" ] || gate agenda debate-judge "$CASE_DIR/agenda.md"
@@ -37,11 +36,12 @@ fi
 S="$CASE_DIR/SDD.md"
 gate sdd debate-judge "$S"
 [ ! -f "$CASE_DIR/auditoria.md" ] || gate auditoria debate-auditor "$CASE_DIR/auditoria.md"
+if no_painel debate-brand || [ -f "$CASE_DIR/BRANDBOOK.md" ]; then gate marca debate-brand "$CASE_DIR/BRANDBOOK.md"; fi
 
 for d in "$CASE_DIR"/specs/*/; do
   [ -d "$d" ] || continue
   gate spec - "${d%/}"
-  b="$(basename "$d")"
+  b="${d%/}"; b="${b##*/}"
   [ -f "$CASE_DIR/checklists/requirements-$b.md" ] || say "$CASE_DIR/checklists/requirements-$b.md" 0 "checklist ausente"
 done
 

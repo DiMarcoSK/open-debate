@@ -133,3 +133,8 @@ debate-k8s: portabilidade; reabre se > 10 servicos
 | debate-gcp | budget | mantido | custo |
 | debate-design | budget | rejeitado | fora do papel |
 | debate-arch | budget | rejeitado | fora do papel |
+| debate-x0 | budget | rejeitado | fora do papel |
+| debate-x1 | budget | rejeitado | fora do papel |
+| debate-x2 | budget | rejeitado | fora do papel |
+| debate-x3 | budget | rejeitado | fora do papel |
+| debate-x4 | budget | rejeitado | fora do papel |

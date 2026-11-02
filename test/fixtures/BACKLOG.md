@@ -23,7 +23,7 @@ Capacidade: 2 x 8 x 5 x 0.7 = 56 dias uteis; backlog soma 29 dias; cabe.
 - [ ] B11 Auditar copy nas telas. Aceite: 0 achados em 3 telas (SDD-5) {E02, est P, dep B06, #copy}
 - [ ] B12 Auditar perf nas telas. Aceite: 0 achados em 3 telas (SDD-5) {E02, est P, dep B06, #perf}
 - [ ] B13 Auditar onboarding nas telas. Aceite: 0 achados em 3 telas (SDD-5) {E02, est P, dep B06, #onboarding}
-- [ ] B14 Auditar assinatura nas telas. Aceite: 0 achados em 3 telas (SDD-5) {E02, est P, dep B06, #assinatura}
+- [ ] B14 Auditar assinatura nas telas. Aceite: 0 achados em 3 telas (SDD-5) {E02, est P, dep B06, #assinatura #marca}
 - [ ] B15 Auditar qa-visual nas telas. Aceite: 0 achados em 3 telas (SDD-5) {E02, est P, dep B06, #qa-visual}
 
 ## Fase 3 - Lancamento (semana 4)

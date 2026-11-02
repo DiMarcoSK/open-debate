@@ -35,16 +35,20 @@ Casos:
   open-debate new "<ideia>" [dest]          cria o caso, default dest=cases
   open-debate run <caso> [opções]           executa o protocolo inteiro, até o backlog
   open-debate specs <caso> <slug> [slug...] cria specs/<nn>-<slug>/ à mão
+  open-debate painel <caso> [--grava] [a,b] mostra o painel que o brief aciona e por quê
   open-debate status <caso>                 mostra cada fase, a próxima, defasagens e custo
   open-debate gate <caso> <fase> [agent...] roda o gate de 1 fase
   open-debate validate <caso> [--brief]     roda todos os gates do caso
   open-debate backlog <caso>                exporta CSV, JSON e script gh
   open-debate tile <caso> [fonte.md]        gera style-tile.html e tokens
 
-  Opções do run: --harness x  --mesa a,b,c  --painel arch,design,sec  --rounds 1-3  --from <fase>
+  Opções do run: --harness x  --mesa a,b,c  --painel design,brand,sec  --rounds 1-3  --from <fase>
+
+Painel: arch, ux e pm entram sempre. Sem --painel, os opcionais saem do brief: design, brand, sec, ai, data,
+mobile, gcp, aws, k8s (references/painel.conf).
 
 --mesa distribui o painel entre harnesses diferentes: cada um opina com outro modelo.
---from arquiva a fase e as seguintes em raw/arquivo e refaz: pesquisa agenda proposta ataque factcheck replica decisao sdd specs backlog.
+--from arquiva a fase e as seguintes em raw/arquivo e refaz: pesquisa agenda proposta ataque factcheck replica decisao sdd marca specs backlog.
 Env do run: MODEL, MODEL_FALLBACK, HARNESS, HARNESS_CMD, ROTAS, MESA, PAINEL, RETRIES, TIMEOUT, BACKOFF, PARALELO, MAX_CHAMADAS, RESEARCH, AGENDA, FACTCHECK, SPECS, REVIEW, REPAIR, FRESH.
 EOF
 }
@@ -187,6 +191,7 @@ case "$cmd" in
   run) need_args "$#" 1; cmd_run "$@" ;;
   specs) need_args "$#" 2; run_script make-specs.sh "$@" ;;
   status) need_args "$#" 1; run_script status.sh "$@" ;;
+  painel) need_args "$#" 1; c="$1"; shift; run_script painel.sh "$c" $(for x in "$@"; do csv "$x"; printf ' '; done) ;;
   gate) need_args "$#" 2; run_script gate.sh "$@" ;;
   validate) need_args "$#" 1; run_script validate.sh "$@" ;;
   backlog) need_args "$#" 1; run_script backlog-export.sh "$@" ;;
