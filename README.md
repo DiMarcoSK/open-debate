@@ -1,13 +1,14 @@
 # open-debate
 
-De uma ideia crua a um produto especificado, por debate entre agents.
+[![CI](https://github.com/FelipeDiMarco/open-debate/actions/workflows/ci.yml/badge.svg)](https://github.com/FelipeDiMarco/open-debate/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Você descreve a ideia. Um painel de especialistas pesquisa, propõe às cegas, ataca as propostas uns dos outros citando arquivo e linha, passa por fact-check, e um juiz decide com matriz ponderada. O resultado é um conjunto de artefatos que um time consegue executar, não um texto de chat.
+From a raw idea to a specified product, through a debate between agents, in the harness you already use.
 
-Roda dentro do [opencode](https://opencode.ai), como comando `/debate`.
+You describe the idea. A panel of specialists researches it, proposes blindly, attacks each other's proposals citing file and line, goes through a fact-check, and a judge decides with a weighted matrix. The result is a set of artifacts a team can execute, not a chat transcript.
 
 ```text
-você:  /debate plataforma de triagem de alertas para SOC pequeno
+you:  /debate alert triage platform for a small SOC
 
 fase 1 pesquisa: ok, 18 achados
 fase 2 proposta: 4/4 ok, design reparado (contraste tinta/papel)
@@ -16,143 +17,176 @@ fase 6 decisao: 5 ADRs, 4 specs
 fase 8 backlog: 42 itens, 61 dias, caminho critico B01 -> B07 -> B19 -> B33
 ```
 
-Os números acima ilustram o formato de saída.
+The numbers above illustrate the output format. Agents and artifacts currently work in Brazilian Portuguese, see [Limitations](#limitations).
 
-## O que você recebe
+## Install
 
-| Artefato | Conteúdo |
+```sh
+curl -fsSL https://raw.githubusercontent.com/FelipeDiMarco/open-debate/main/install.sh | sh
+```
+
+The installer puts the `open-debate` command in `~/.local/bin`, finds the harnesses on your machine and installs `/debate` in each one. Running it again updates. It requires macOS or Linux, `jq` and `perl`. On Windows, use WSL.
+
+With Node, without a global install:
+
+```sh
+npx github:FelipeDiMarco/open-debate init
+```
+
+Then open your harness and run `/debate <your idea>`. To check your setup:
+
+```sh
+open-debate doctor          # dependencies and installation
+open-debate doctor --live   # 1 real call on each installed harness
+```
+
+## Harnesses
+
+| Harness | ID | Invocation | Panel runs as |
+|---|---|---|---|
+| [opencode](https://opencode.ai) | `opencode` | `/debate` | subagents, one model per agent |
+| Claude Code | `claude` | `/debate` | subagents |
+| Codex CLI | `codex` | `$debate` | subagents |
+| Cursor | `cursor` | `/debate` | subagents |
+| Gemini CLI | `gemini` | `/debate` | subagents |
+| oh-my-pi | `omp` | `/skill:debate` | subagents |
+| Factory Droid | `droid` | `/debate` | subagents |
+| GitHub Copilot CLI | `copilot` | `/debate` | subagents |
+| Qwen Code | `qwen` | `/debate` | subagents |
+| Antigravity CLI | `agy` | `/debate` | headless processes |
+| DeepSeek Harness | `dsh` | `/debate` | headless processes |
+| Pi | `pi` | `/skill:debate` | headless processes |
+| Cline | `cline` | `/debate` | headless processes |
+
+Any other CLI with a headless mode also works, with no code changes. What differs between harnesses, and which ones were tested with real calls, is in [docs/harnesses.md](docs/harnesses.md).
+
+`init` uses whatever it detects. To choose:
+
+```sh
+open-debate init --harness claude,codex    # only these
+open-debate init --all                     # every supported harness
+open-debate init --project                 # current project instead of user level
+```
+
+## What you get
+
+| Artifact | Contents |
 |---|---|
-| `research.md` | Achados com URL, prior art, preços e limites, lacunas |
-| `decision.md`, `adr/` | Matriz ponderada e ADRs em MADR 4.0, com alternativa rejeitada e dissenso |
-| `SDD.md` | Design doc arc42 enxuto, com C4 em mermaid, capacidade, falhas e STRIDE |
-| `style-tile.html`, `tokens.json`, `tokens.css` | Direção visual com contraste WCAG 2.2 medido, tokens W3C DTCG |
-| `specs/` | `spec.md`, `plan.md` e `tasks.md` por feature, no estilo GitHub Spec Kit, com requisitos EARS |
-| `BACKLOG.md`, `backlog.csv`, `backlog.json`, `backlog-gh.sh` | Backlog até o lançamento, com dependências, estimativas e caminho crítico |
+| `research.md` | Findings with URLs, prior art, prices and limits, gaps |
+| `decision.md`, `adr/` | Weighted matrix and MADR 4.0 ADRs, with rejected alternatives and dissent |
+| `SDD.md` | Lean arc42 design doc, with C4 in mermaid, capacity, failures and STRIDE |
+| `style-tile.html`, `tokens.json`, `tokens.css` | Visual direction with measured WCAG 2.2 contrast, W3C DTCG tokens |
+| `specs/` | `spec.md`, `plan.md` and `tasks.md` per feature, GitHub Spec Kit style, with EARS requirements |
+| `BACKLOG.md`, `backlog.csv`, `backlog.json`, `backlog-gh.sh` | Backlog through launch, with dependencies, estimates and critical path |
 
-## Por que funciona
+## Why it works
 
-- **Proposta cega.** Cada especialista escreve antes de ver os outros, com modelos de famílias diferentes.
-- **Ataque com evidência.** Veto precisa de citação literal, problema com número e troca concreta. Crítica sem concessão é descartada.
-- **Número sem fonte é opinião.** Todo número cita `research.md` ou mostra a conta. O que o fact-check marca como errado vale zero na matriz.
-- **Gates determinísticos.** Scripts, não LLM, verificam cada fase: contraste calculado, ADRs completos, dependências sem ciclo. Reprovou, o agent recebe o motivo e tem 1 chance de reparo.
-- **Retoma de onde parou.** Cada fase é um arquivo. Limite de provider no meio do caminho não perde trabalho.
+- **Blind proposals.** Each specialist writes before seeing the others.
+- **Attacks need evidence.** A veto requires a literal quote, a problem with a number and a concrete replacement. Criticism without a concession is discarded.
+- **A number without a source is an opinion.** Every number cites `research.md` or shows the math. Whatever the fact-check marks wrong scores zero in the matrix.
+- **Deterministic gates.** Scripts, not an LLM, check each phase: computed contrast, complete ADRs, dependencies without cycles. On failure, the agent gets the reason and 1 repair attempt.
+- **Resumes where it stopped.** Each phase is a file. A provider limit halfway through loses no work.
 
-## Instalação
+## Usage
 
-Requer [opencode](https://opencode.ai), `jq`, `perl` e um shell POSIX (macOS ou Linux).
-
-```sh
-npm i -g github:FelipeDiMarco/open-debate
-open-debate init
-```
-
-Ou sem npm:
-
-```sh
-git clone https://github.com/FelipeDiMarco/open-debate.git && cd open-debate
-./bin/open-debate init
-```
-
-`init` instala em `~/.config/opencode`. Para instalar só em um projeto, use `open-debate init --project`, que grava em `./.opencode`.
-
-Depois, confira o ambiente e use:
-
-```sh
-open-debate doctor
-opencode            # e dentro dele: /debate <sua ideia>
-```
-
-### Já tem uma instalação manual
-
-`init` não sobrescreve arquivos que não reconhece: ele lista os conflitos e para. `open-debate init --force` guarda esses arquivos em `.open-debate-backup-*.tgz` e instala por cima, mantendo o `model:` de cada agent.
-
-## Uso
-
-### Na sessão do opencode
+### In a session
 
 ```text
-/debate <ideia> [--painel arch,design,gcp,k8s] [--rounds 1-3] [--sem-pesquisa] [--sem-factcheck]
+/debate <idea> [--painel arch,design,gcp,k8s] [--rounds 1-3] [--sem-pesquisa] [--sem-factcheck]
 ```
 
-O agent faz até 6 perguntas de intake e conduz as fases. O caso fica em `cases/<slug>/`. Rodar `/debate` de novo sobre um caso existente retoma da primeira fase que não passa no gate.
+The agent asks up to 6 intake questions and runs the phases. The case lives in `cases/<slug>/`. Running `/debate` again on an existing case resumes from the first phase that fails its gate.
 
-### Na linha de comando
+### From the command line
 
-Para modelo pago ou self-hosted, CI e reexecução em lote. Modelos gratuitos do opencode recusam chamada headless, então use a sessão com eles.
+Runs the whole protocol, from research to backlog, with each specialist in an isolated process. Use it for CI, batch reruns and any harness with a headless mode. Nothing has to be installed in the harness, it only needs to be logged in.
 
 ```sh
-caso=$(open-debate new "triagem de alertas")
-$EDITOR "$caso/brief.md"
-MODEL=<provider>/<modelo> open-debate run "$caso"
-open-debate specs "$caso" ingestao triagem relatorio     # slugs do indice de decision.md
-# preencha as specs e rode de novo para gerar o backlog
-MODEL=<provider>/<modelo> open-debate run "$caso"
-open-debate validate "$caso"
+case=$(open-debate new "alert triage")
+$EDITOR "$case/brief.md"
+open-debate run "$case" --harness claude
 ```
 
-| Comando | Faz |
+opencode's free models refuse headless calls, so use a session with them.
+
+### Mixed panel
+
+A debate gets better when opinions come from different model families. If you have access to more than one CLI, spread the panel across them:
+
+```sh
+open-debate run "$case" --harness claude --mesa claude,codex,gemini
+```
+
+`--harness` runs research, judge and backlog, and `--mesa` rotates the panel. See [per-agent routes](docs/harnesses.md#models).
+
+### Commands
+
+| Command | What it does |
 |---|---|
-| `init`, `update`, `uninstall` | Gerenciam a instalação; aceitam `--project` e `--force` |
-| `doctor` | Confere dependências, instalação e modelos |
-| `models check\|apply\|free` | Confere, aplica ou lista modelos |
-| `new`, `run`, `specs` | Criam e executam um caso |
-| `gate`, `validate` | Rodam os gates de uma fase ou do caso inteiro |
-| `backlog`, `tile` | Exportam o backlog e o style tile |
+| `init`, `update`, `uninstall` | Manage the installation; accept `--harness`, `--all`, `--project` and `--force` |
+| `doctor [--live]` | Checks dependencies and installation; `--live` makes 1 real call |
+| `harnesses` | Lists supported harnesses and the state of each |
+| `models check\|apply\|free` | Check, apply or list opencode models |
+| `new`, `run` | Create and execute a case |
+| `specs` | Create specs by hand, for use with `SPECS=0` |
+| `gate`, `validate` | Run the gates for one phase or the whole case |
+| `backlog`, `tile` | Export the backlog and the style tile |
 
-Variáveis do `run`: `MODEL`, `MODEL_FALLBACK`, `PAINEL`, `RETRIES=2`, `TIMEOUT=600`, `MIN_LINES=5`, `RESEARCH=1`, `FACTCHECK=1`, `REVIEW=1`, `REPAIR=1`, `FRESH=0`.
+`run` variables: `HARNESS`, `MODEL`, `MODEL_FALLBACK`, `MESA`, `ROTAS`, `HARNESS_CMD`, `PAINEL`, `RETRIES=2`, `TIMEOUT=600`, `MIN_LINES=5`, `RESEARCH=1`, `FACTCHECK=1`, `SPECS=1`, `REVIEW=1`, `REPAIR=1`, `FRESH=0`.
 
-## O protocolo
+## The protocol
 
 ```mermaid
 flowchart TD
-  A[Intake: brief e constituição] --> B[Pesquisa com scouts em paralelo]
-  B --> C[Propostas cegas do painel]
-  C --> D[Ataques com citação]
+  A[Intake: brief and constitution] --> B[Research with parallel scouts]
+  B --> C[Blind panel proposals]
+  C --> D[Attacks with citations]
   D --> E[Fact-check]
-  E --> F[Réplica]
-  F --> G[Juiz: matriz, ADRs, SDD, tokens]
-  G --> H[Specs por feature]
-  H --> I[Trilhas de design e engenharia]
-  I --> J[Backlog até o lançamento]
+  E --> F[Rebuttal]
+  F --> G[Judge: matrix, ADRs, SDD, tokens]
+  G --> H[Per-feature specs]
+  H --> I[Design and engineering tracks]
+  I --> J[Backlog through launch]
 ```
 
-| Fase | Agent | Gate |
+| Phase | Agent | Gate |
 |---|---|---|
-| 0 intake | `debate` | brief sem campo vazio |
-| 1 pesquisa | `debate-research`, `debate-scout` | 5+ URLs distintas, seção Lacunas |
-| 2 proposta | painel | concessão; C4 e ADRs (arch); contraste e estados (design) |
-| 3 ataque | painel | veto, citação literal, concessão |
-| 4 fact-check | `debate-research` | não bloqueia |
-| 5 réplica | painel | não bloqueia |
-| 6 decisão e SDD | `debate-judge` | 3+ ADRs MADR, 3-6 specs, dissenso, SDD sem placeholder |
-| 7 specs | `debate-arch`, `debate-design` | `validate` zera |
-| 8 backlog | `debate-design`, `debate-arch`, `debate-pm` | 15+ itens, cobertura de specs, ADRs e lapidação, sem ciclos |
+| 0 intake | orchestrator | no empty brief field |
+| 1 research | `debate-research`, `debate-scout` | 5+ distinct URLs, gaps section |
+| 2 proposal | panel | concession; C4 and ADRs (arch); contrast and states (design) |
+| 3 attack | panel | veto, literal quote, concession |
+| 4 fact-check | `debate-research` | non-blocking |
+| 5 rebuttal | panel | non-blocking |
+| 6 decision and SDD | `debate-judge` | 3+ MADR ADRs, 3-6 specs, dissent, SDD without placeholders |
+| 7 specs | `debate-arch`, `debate-design` | `validate` passes |
+| 8 backlog | `debate-design`, `debate-arch`, `debate-pm` | 15+ items, covers specs, ADRs and polish, no cycles |
 
-Detalhes em [`protocol.md`](template/skills/architect-debate/references/protocol.md) e nas [regras do debate](template/skills/architect-debate/references/regras-debate.md).
+Details in [`protocol.md`](template/skills/architect-debate/references/protocol.md) and the [debate rules](template/skills/architect-debate/references/regras-debate.md).
 
-## Personalização
+## Customization
 
-**Modelos.** `modelos.conf` define 1 modelo por agent. Os padrões são modelos gratuitos do opencode, que entram e saem do catálogo: rode `open-debate models check` antes de um debate longo, e `open-debate models apply` troca o que saiu pela reserva. Editar `modelos.conf` ou o `model:` de um agent sobrevive ao `update`. Para usar um provider próprio, aponte o agent para ele.
+**Models.** On opencode, `modelos.conf` sets 1 model per agent. The defaults are free models, which come and go from the catalog: run `open-debate models check` before a long debate. On other harnesses, the agent inherits the session model, and you can pin another on its `model` line. Your choice survives `update`.
 
-**Painel.** O painel padrão é `arch`, `design`, `gcp` e `k8s`, então a discussão de infraestrutura assume Google Cloud. Para outra nuvem, crie um agent `debate-aws.md` no modelo de `debate-gcp.md` e passe `--painel arch,design,aws`.
+**Panel.** The default panel is `arch`, `design`, `gcp` and `k8s`, so the infrastructure discussion assumes Google Cloud. For another cloud, create a `debate-aws.md` persona modeled on `debate-gcp.md`, in `template/skills/architect-debate/personas/`, and pass `--painel arch,design,aws`.
 
-**Princípios.** `constitution.md` é copiado para cada caso, e o intake pode ajustá-lo. Violar um princípio exige override escrito.
+**Principles.** `constitution.md` is copied into each case, and the intake can adjust it. Breaking a principle requires a written override.
 
-## Limitações
+## Limitations
 
-- Templates, prompts e gates são em português: os artefatos saem em pt-BR.
-- Os gates verificam forma e números, não a qualidade da decisão. Revise SDD e ADRs.
-- O custo e a duração dependem dos modelos. Um debate completo faz dezenas de chamadas.
-- Windows só via WSL.
+- Templates, prompts and gates are in Portuguese, so artifacts come out in pt-BR.
+- Gates check form and numbers, not decision quality. Review the SDD and ADRs.
+- Cost and duration depend on the models. A full debate makes dozens of calls.
+- On a harness with a single model, proposals tend to look alike. Use a mixed panel.
+- Windows only through WSL.
 
-## Desenvolvimento
+## Development
 
 ```sh
 npm test
 ```
 
-A suíte não usa rede nem LLM: um `opencode` falso em `test/stub/` percorre o protocolo inteiro. Veja [CONTRIBUTING.md](CONTRIBUTING.md).
+The suite uses no network or LLM: fake CLIs in `test/stub/` walk the whole protocol, one per harness. See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md).
 
-## Licença
+## License
 
 [MIT](LICENSE)

@@ -1,10 +1,12 @@
 #!/bin/sh
-# debate.sh <case-dir> [rounds] - fases 1-6: pesquisa, proposta, ataque, fact-check, replica, juiz, ADRs, SDD, style tile.
+# debate.sh <case-dir> [rounds] - protocolo inteiro: pesquisa, proposta, ataque, fact-check, replica, juiz, ADRs, SDD, specs, backlog.
 # Gate reprovado ganha 1 reparo com o motivo (REPAIR=1); reprovou de novo, aborta. Rodar de novo retoma.
-# Modo CLI: para modelo pago ou proprio (MODEL=<provider>/<modelo>). Modelos free do opencode recusam chamada headless:
-# use /debate dentro do opencode (modo sessao, subagents).
-# Env: MODEL (vazio = modelo do agent), MODEL_FALLBACK (1x em 401/403/limite free), RETRIES=2, TIMEOUT=600, MIN_LINES=5, FRESH=0, REVIEW=1,
-#      RESEARCH=1, FACTCHECK=1, REPAIR=1, PAINEL="debate-arch debate-design debate-gcp debate-k8s".
+# Cada especialista roda como processo isolado no harness escolhido. Modelos free do opencode recusam chamada headless:
+# neles use /debate dentro do opencode (modo sessao, subagents).
+# Env: HARNESS=opencode, MODEL (vazio = padrao do harness), MODEL_FALLBACK (1x em auth ou limite), RETRIES=2, TIMEOUT=600, MIN_LINES=5,
+#      FRESH=0, REVIEW=1, RESEARCH=1, FACTCHECK=1, SPECS=1, REPAIR=1, PAINEL="debate-arch debate-design debate-gcp debate-k8s",
+#      MESA="claude codex" (painel distribuido entre harnesses), ROTAS="debate-arch=claude debate-design=codex:gpt-5" (rota por agent),
+#      HARNESS_CMD (HARNESS=custom: comando que le $PROMPT e $MODEL e imprime a resposta).
 set -eu
 export LC_ALL=C
 
@@ -20,18 +22,23 @@ REVIEW="${REVIEW:-1}"
 RESEARCH="${RESEARCH:-1}"
 FACTCHECK="${FACTCHECK:-1}"
 REPAIR="${REPAIR:-1}"
+SPECS="${SPECS:-1}"
+HARNESS="${HARNESS:-opencode}"
+MESA="${MESA:-}"
+ROTAS="${ROTAS:-}"
+[ -n "${PAINEL:-}" ] || PAINEL="$(sed -n 's/^painel: //p' "$CASE_DIR/meta.txt" 2>/dev/null | tail -1)"
 PAINEL="${PAINEL:-debate-arch debate-design debate-gcp debate-k8s}"
 
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 REF="$SCRIPT_DIR/../references"
 TOK="$SCRIPT_DIR/tokens.awk"
 . "$SCRIPT_DIR/gates.sh"
+. "$SCRIPT_DIR/harness.sh"
 
 case "$ROUNDS" in ''|*[!0-9]*) ROUNDS=3;; esac
 [ "$ROUNDS" -gt 3 ] && ROUNDS=3
 [ "$ROUNDS" -lt 1 ] && ROUNDS=1
 
-command -v opencode >/dev/null 2>&1 || { echo "erro: opencode nao encontrado no PATH" >&2; exit 2; }
 command -v jq >/dev/null 2>&1 || { echo "erro: jq nao encontrado no PATH" >&2; exit 2; }
 command -v perl >/dev/null 2>&1 || { echo "erro: perl nao encontrado no PATH (usado no timeout)" >&2; exit 2; }
 [ -f "$CASE_DIR/constitution.md" ] || { echo "erro: $CASE_DIR/constitution.md ausente, rode new-debate.sh" >&2; exit 2; }
@@ -39,42 +46,56 @@ command -v perl >/dev/null 2>&1 || { echo "erro: perl nao encontrado no PATH (us
 n=0; for a in $PAINEL; do n=$((n + 1)); done
 [ "$n" -ge 2 ] || { echo "erro: PAINEL precisa de 2+ agents" >&2; exit 2; }
 
+# Mesa: 1 harness por vez ao redor do painel. ROTAS explicitas vencem.
+if [ -n "$MESA" ]; then
+  set -- $MESA; i=0; n_m="$#"; distrib=""
+  for a in $PAINEL; do
+    i=$((i + 1)); j=$(( (i - 1) % n_m + 1 )); eval "h=\${$j}"
+    distrib="$distrib $a=$h"
+  done
+  ROTAS="${distrib# } $ROTAS"
+fi
+
+# rota <agent>: imprime "<harness> <modelo>"; modelo pode vir vazio.
+rota() {
+  r=""
+  for x in $ROTAS; do case "$x" in "$1="*) r="${x#*=}" ;; esac; done
+  [ -n "$r" ] || { printf '%s %s' "$HARNESS" "$MODEL"; return; }
+  case "$r" in
+    *:*) printf '%s %s' "${r%%:*}" "${r#*:}" ;;
+    *) printf '%s ' "$r" ;;
+  esac
+}
+
+h_existe "$HARNESS"
+for x in $ROTAS; do r="${x#*=}"; h_existe "${r%%:*}"; done
+
 # macOS nao tem timeout(1); perl alarm mata a chamada que trava em retry infinito do provider.
 TO="perl -e alarm(shift);exec(@ARGV)||die $TIMEOUT"
 
-OUT="$CASE_DIR"
+OUT="$(CDPATH= cd -- "$CASE_DIR" && pwd)"
 mkdir -p "$OUT/proposals" "$OUT/critiques" "$OUT/raw" "$OUT/adr"
-for t in regras-debate.md visual-contract.md research-template.md adr-template.md backlog-template.md lapidacao.md sdd-template.md; do
+for t in regras-debate.md visual-contract.md research-template.md adr-template.md backlog-template.md lapidacao.md sdd-template.md spec-template.md plan-template.md tasks-template.md; do
   [ -f "$OUT/$t" ] || cp "$REF/$t" "$OUT/$t"
 done
-{ grep -v '^painel:' "$OUT/meta.txt" 2>/dev/null || true; printf 'painel: %s\n' "$PAINEL"; } > "$OUT/meta.txt.tmp"
+{ grep -v '^painel:\|^harness:' "$OUT/meta.txt" 2>/dev/null || true; printf 'painel: %s\nharness: %s\n' "$PAINEL" "$HARNESS"; } > "$OUT/meta.txt.tmp"
 mv "$OUT/meta.txt.tmp" "$OUT/meta.txt"
 
 PIDFILE="$OUT/raw/pids.$$"
 SUMMARY="$OUT/raw/summary.log"
 : > "$PIDFILE"
-printf '\n== %s rounds=%s painel=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$ROUNDS" "$PAINEL" >> "$SUMMARY"
+printf '\n== %s rounds=%s harness=%s rotas=%s painel=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$ROUNDS" "$HARNESS" "$ROTAS" "$PAINEL" >> "$SUMMARY"
 
 log() { printf '%s\n' "$*" | tee -a "$SUMMARY"; }
 abort() { log "ABORTA: $*"; rm -f "$PIDFILE"; exit 1; }
 
-extract_text() {
-  jq -r 'select(.type == "text") | .part.text // empty' "$1" > "$2" 2>/dev/null || true
-  [ -s "$2" ] && return 0
-  jq -r '.text // empty' "$1" > "$2" 2>/dev/null || true
-  [ -s "$2" ] && return 0
-  jq -r '.. | .text? // empty' "$1" > "$2" 2>/dev/null || true
-  [ -s "$2" ]
-}
-
-auth_failed() { grep -qi 'FreeTierError\|Free usage limit\|statusCode[^0-9]*40[13]\|unauthorized' "$1" "$1.stderr" 2>/dev/null; }
-
 run_once() {
-  agent="$1"; task="$2"; dest="$3"; raw="$4"; model="$5"
-  set -- --agent "$agent" --format json --dir "$OUT"
-  [ -n "$model" ] && set -- "$@" -m "$model"
-  $TO opencode run --print-logs --log-level ERROR "$@" "$task" > "$raw.tmp" 2>"$raw.tmp.stderr" || return 1
-  extract_text "$raw.tmp" "$dest.new" || return 1
+  agent="$1"; task="$2"; dest="$3"; raw="$4"; rot="$5"
+  h="${rot%% *}"; m="${rot#* }"
+  rc=0; h_run "$h" "$agent" "$task" "$m" "$OUT" "$raw.tmp" || rc=$?
+  if [ "$rc" -eq 142 ]; then log "tempo esgotado em $agent apos ${TIMEOUT}s: aumente TIMEOUT e rode de novo"; fi
+  [ "$rc" -eq 0 ] || return 1
+  h_texto "$h" "$raw.tmp" "$dest.new" || return 1
   [ "$(wc -l < "$dest.new" | tr -d ' ')" -ge "$MIN_LINES" ] || return 1
   mv "$dest.new" "$dest"
   mv "$raw.tmp" "$raw"
@@ -82,16 +103,17 @@ run_once() {
 
 run_agent() {
   agent="$1"; task="$2"; dest="$3"; raw="$4"
+  rot="$(rota "$agent")"
   attempt=1
   while [ "$attempt" -le "$RETRIES" ]; do
-    run_once "$agent" "$task" "$dest" "$raw" "$MODEL" && return 0
-    if auth_failed "$raw.tmp" && [ -z "$MODEL_FALLBACK" ]; then
-      log "limite do plano free em $agent: modelos free so rodam dentro da sessao do opencode (/debate), ou defina MODEL pago/proprio"
+    run_once "$agent" "$task" "$dest" "$raw" "$rot" && return 0
+    if h_auth_falhou "$raw.tmp" && [ -z "$MODEL_FALLBACK" ]; then
+      log "auth ou limite em $agent (${rot%% *}): confira o login; no opencode, modelos free so rodam na sessao (/debate)"
       break
     fi
-    if auth_failed "$raw.tmp" && [ -n "$MODEL_FALLBACK" ]; then
-      log "auth no modelo primario, fallback 1x para $dest"
-      run_once "$agent" "$task" "$dest" "$raw" "$MODEL_FALLBACK" && return 0
+    if h_auth_falhou "$raw.tmp" && [ -n "$MODEL_FALLBACK" ]; then
+      log "auth ou limite no modelo primario, fallback 1x para $dest"
+      run_once "$agent" "$task" "$dest" "$raw" "${rot%% *} $MODEL_FALLBACK" && return 0
       break
     fi
     attempt=$((attempt + 1))
@@ -246,6 +268,50 @@ gate_one sdd debate-judge "$OUT/SDD.md" "$T" "$OUT/raw/f6-sdd.json" || abort "ga
 if "$SCRIPT_DIR/style-tile.sh" "$OUT" >> "$SUMMARY" 2>&1; then log "style tile: $OUT/style-tile.html"
 else log "style tile falhou, ver $SUMMARY"; fi
 
+# fase 7 - specs: 1 chamada por item do indice de decision.md, em paralelo
+spec_pendente() { [ ! -s "$1/spec.md" ] || grep -q '<nn>\|<slug>\|<quem>' "$1/spec.md"; }
+spec_tarefa() {
+  printf 'fase spec: gera spec, plan e tasks da spec %s; le brief.md, SDD.md, decision.md, adr/, visual-contract.md, spec-template.md, plan-template.md e tasks-template.md; responde so com os 3 arquivos, cada um aberto pela linha <!-- arquivo: nome -->' "$(basename "$1")"
+}
+spec_separa() {
+  awk -v d="$1" '
+    /^<!-- arquivo: (spec|plan|tasks)\.md -->[[:space:]]*$/ { if (f != "") close(f); n = $3; f = d "/" n; printf "" > f; next }
+    f != "" { print > f }' "$2"
+}
+# Falha do conteudo, no mesmo formato de reprovacao dos gates.
+spec_motivo() {
+  for f in spec plan tasks; do
+    [ -s "$1/$f.md" ] || { printf '%s.md ausente' "$f"; return 0; }
+    if grep -q '<nn>\|<slug>\|<quem>\|<evento>\|ADR-NNNN' "$1/$f.md"; then printf '%s.md com placeholder' "$f"; return 0; fi
+  done
+  grep -q 'ADR-[0-9]' "$1/spec.md" || printf 'spec sem ADR citado'
+}
+if [ "$SPECS" = "1" ]; then
+  if ! ls -d "$OUT"/specs/[0-9]*/ >/dev/null 2>&1; then
+    slugs="$(sed -n 's/^.*`[0-9][0-9] \([a-z0-9-]*\)`.*$/\1/p' "$OUT/decision.md")"
+    # shellcheck disable=SC2086
+    "$SCRIPT_DIR/make-specs.sh" "$OUT" $slugs >> "$SUMMARY"
+  fi
+  for d in "$OUT"/specs/[0-9]*/; do
+    d="${d%/}"; b="$(basename "$d")"
+    spec_pendente "$d" && launch debate-arch "$(spec_tarefa "$d")" "$OUT/raw/f7-$b.md" "$OUT/raw/f7-$b.json" forca
+  done
+  wait_all "fase specs" || abort "fase specs"
+  for d in "$OUT"/specs/[0-9]*/; do
+    d="${d%/}"; b="$(basename "$d")"
+    if spec_pendente "$d" && [ -s "$OUT/raw/f7-$b.md" ]; then spec_separa "$d" "$OUT/raw/f7-$b.md"; fi
+    r="$(spec_motivo "$d")"
+    [ -z "$r" ] && continue
+    log "gate spec reprovado em $b: $r"
+    [ "$REPAIR" = "1" ] || abort "gate specs"
+    run_agent debate-arch "$(reparo "$(spec_tarefa "$d")" "raw/f7-$b.md" "$r")" "$OUT/raw/f7-$b.md" "$OUT/raw/f7-$b-reparo.json" || abort "reparo da spec $b"
+    spec_separa "$d" "$OUT/raw/f7-$b.md"
+    r="$(spec_motivo "$d")"
+    [ -z "$r" ] || abort "gate spec apos reparo em $b: $r"
+  done
+  log "gate specs ok"
+fi
+
 # fase 8 - backlog, so com specs preenchidas
 SPECS_OK=0
 if ls "$OUT"/specs/[0-9]*/spec.md >/dev/null 2>&1 && ! grep -l '<nn>\|<slug>\|<quem>' "$OUT"/specs/*/spec.md >/dev/null 2>&1; then SPECS_OK=1; fi
@@ -264,4 +330,4 @@ fi
 rm -f "$PIDFILE"
 log "debate ok: decision.md, adr/, SDD.md, style-tile.html em $OUT"
 if [ "$SPECS_OK" = "1" ]; then log "backlog ok: BACKLOG.md, backlog.csv, backlog.json, backlog-gh.sh"
-else log "proximo: make-specs.sh $OUT <slugs do indice de decision.md>, preencher specs e rodar debate.sh de novo para a fase 8 (backlog)"; fi
+else log "proximo: preencher as specs (make-specs.sh, com SPECS=0) e rodar debate.sh de novo para a fase 8 (backlog)"; fi

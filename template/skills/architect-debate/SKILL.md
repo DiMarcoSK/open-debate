@@ -6,7 +6,7 @@ description: Turn a raw product idea into a researched, debated design doc with 
 Padroes: design doc no formato arc42 enxuto, backlog com epicos, fatias verticais INVEST, esqueleto andante, DoR/DoD e caminho critico, C4 em mermaid, ISO/IEC 25010 + cenarios ATAM, ADR em MADR 4.0, requisitos EARS, specs no estilo GitHub Spec Kit, tokens W3C DTCG, contraste WCAG 2.2, heuristicas de Nielsen, STRIDE.
 Estado do caso em `references/protocol.md`. Scripts em `{{SCRIPTS}}/` (abaixo, `$S`).
 
-## Modo sessao (padrao: /debate, agent `debate`, subagents com modelos gratuitos)
+## Modo sessao (padrao: /debate; um especialista por subagent)
 
 Fase 0, intake, 1 rodada com ate 6 perguntas, cada uma com 2-4 opcoes e default:
 1. objetivo, quem usa, metrica de sucesso em 90 dias; 2. carga (usuarios, req/dia, pico); 3. prazo, time, custo teto/mes;
@@ -28,7 +28,7 @@ Fases 1-6, cada linha e 1 leva de Task. `le` e `escreve` vao no prompt do Task, 
 
 Gate reprovado: 1 Task de reparo para o mesmo agent com `CORRECAO: <motivo do gate>`; reprovou de novo, para e reporta. Caso existente retoma: pula fase cujo arquivo ja passa no gate.
 
-Fase 7, specs: `$S/make-specs.sh <caso> <slugs do indice de decision.md>`; 1 Task por spec em paralelo (debate-arch para spec/plan/tasks, debate-design preenche spec secao 6 quando ha UI), depois `$S/gate.sh <caso> specs`, reparo na origem ate zerar.
+Fase 7, specs: `$S/make-specs.sh <caso> <slugs do indice de decision.md>`; 1 Task por spec em paralelo (debate-arch, `fase spec`, para spec/plan/tasks, debate-design preenche spec secao 6 quando ha UI), depois `$S/gate.sh <caso> specs`, reparo na origem ate zerar.
 
 Fase 8, backlog ate o produto lapidado:
 1. Leva em paralelo: debate-design `fase backlog-design` escreve `backlog/design.md`; debate-arch `fase backlog-eng` escreve `backlog/eng.md`. Ambos leem SDD.md, adr/, specs/, lapidacao.md, backlog-template.md. Gate: `$S/gate.sh <caso> trilhas`.
@@ -48,21 +48,19 @@ Dissenso que pode reabrir: <1 linha>
 Perguntas abertas: <max 3, com default>
 ```
 
-## Modo CLI (`debate.sh`, para modelo pago ou proprio)
+## Modo CLI (`debate.sh`, qualquer harness com modo headless)
 
-Modelos gratuitos do opencode recusam chamada headless (`Free usage limit reached`); o modo CLI serve para `MODEL=<provider/modelo>` pago ou self-hosted, CI e reexecucao em lote. Mesmo protocolo, mesmos gates.
+Cada especialista roda como processo isolado, com a persona no prompt; nada precisa estar instalado no harness. Mesmo protocolo, mesmos gates, ate o backlog. E o caminho para harness sem subagents (agy, pi, dsh, cline), CI, reexecucao em lote e mesa com harnesses diferentes. Modelos gratuitos do opencode recusam chamada headless (`Free usage limit reached`): neles use o modo sessao.
 
 ```sh
 $S/new-debate.sh "<ideia>" [dest-cases]
-MODEL=<provider>/<modelo> $S/debate.sh <caso> [rounds]
-$S/make-specs.sh <caso> <slug1> [slug2...]   # preencher specs
-MODEL=<provider>/<modelo> $S/debate.sh <caso> [rounds]   # de novo: com specs preenchidas roda a fase 8 (backlog)
-$S/backlog-export.sh <caso>
+HARNESS=<id> $S/debate.sh <caso> [rounds]
+MESA="claude codex gemini" HARNESS=claude $S/debate.sh <caso>   # painel distribuido
 $S/validate.sh <caso> [--brief]
 ```
 
-Env: `MODEL` (vazio = modelo de cada agent), `MODEL_FALLBACK`, `RETRIES=2`, `TIMEOUT=600` s por chamada, `MIN_LINES=5`, `PAINEL`, `RESEARCH=1`, `FACTCHECK=1`, `REVIEW=1`, `REPAIR=1`, `FRESH=0`, `OVERWRITE=0`.
+Env: `HARNESS`, `MODEL` (vazio = padrao do harness), `MODEL_FALLBACK`, `MESA`, `ROTAS` (`debate-arch=claude debate-design=codex:<modelo>`), `HARNESS_CMD` (com `HARNESS=custom`), `RETRIES=2`, `TIMEOUT=600` s por chamada, `MIN_LINES=5`, `PAINEL`, `RESEARCH=1`, `FACTCHECK=1`, `SPECS=1`, `REVIEW=1`, `REPAIR=1`, `FRESH=0`, `OVERWRITE=0`.
 
 ## Modelos
 
-`modelos.conf` define 1 modelo gratuito por agent, de familias diferentes (paralelo sem disputar o mesmo limite, opinioes menos parecidas). `$S/modelos.sh check` confere contra `opencode models`; `$S/modelos.sh aplicar` grava nos agents e troca modelo que saiu do catalogo pela reserva. Rodar `check` antes de um debate longo.
+No opencode, `modelos.conf` define 1 modelo gratuito por agent, de familias diferentes (paralelo sem disputar o mesmo limite, opinioes menos parecidas). Nos demais harnesses os agents herdam o modelo da sessao; edite a linha `model` do agent ou use `MESA` para diversificar. `$S/modelos.sh check` confere contra `opencode models`; `$S/modelos.sh aplicar` grava nos agents e troca modelo que saiu do catalogo pela reserva. Rodar `check` antes de um debate longo.

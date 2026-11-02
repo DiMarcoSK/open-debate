@@ -31,6 +31,7 @@ case "$task" in
   "fase replica"*) f=replica.md ;;
   "fase decisao"*) f=decision.md ;;
   "fase sdd"*|"fase revisao"*) f=SDD.md ;;
+  "fase spec"*) f=spec-bundle.md ;;
   "fase backlog-design"*|"fase backlog-eng"*) f=trilha.md ;;
   "fase backlog"*) f=BACKLOG.md ;;
   *) echo "stub: tarefa desconhecida: $task" >&2; exit 2 ;;

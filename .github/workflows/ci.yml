@@ -6,6 +6,12 @@ on:
   pull_request:
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: shellcheck -s sh -S error install.sh bin/open-debate lib/*.sh template/skills/architect-debate/scripts/*.sh test/run.sh test/stub/*
+
   test:
     strategy:
       fail-fast: false

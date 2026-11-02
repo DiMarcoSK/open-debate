@@ -1,9 +1,16 @@
 {
   "name": "open-debate",
-  "version": "0.1.0",
-  "description": "Turn a raw product idea into a researched, debated design: SDD, ADRs, design tokens, specs and backlog, built by a panel of opencode agents",
+  "version": "0.2.0",
+  "description": "Turn a raw product idea into a researched, debated design: SDD, ADRs, design tokens, specs and backlog, built by a panel of agents. Works with opencode, Claude Code, Codex, Cursor, Gemini, Antigravity, oh-my-pi, Pi, dsh, Droid, Copilot, Qwen and Cline",
   "keywords": [
     "opencode",
+    "claude-code",
+    "codex",
+    "cursor",
+    "gemini-cli",
+    "antigravity",
+    "oh-my-pi",
+    "deepseek",
     "ai",
     "agents",
     "architecture",
@@ -24,7 +31,9 @@
   "files": [
     "bin",
     "lib",
-    "template"
+    "template",
+    "docs",
+    "install.sh"
   ],
   "os": [
     "darwin",

@@ -42,3 +42,4 @@ cases/<slug>/
 - painel 2-5 agents; juiz e pesquisador fora do painel
 - resume por padrao: saida existente e reaproveitada; `FRESH=1` refaz
 - provider falhou: modo sessao repete o Task 1x e segue com painel >= 2; CLI usa `MODEL_FALLBACK` 1x
+- fase 7 no CLI: 1 chamada por item do indice de decision.md; `SPECS=0` deixa as specs para preenchimento manual

@@ -1,0 +1,42 @@
+#!/bin/sh
+# Stub dos harnesses: o nome do link escolhe o formato de saida real daquele CLI. Sem rede e sem LLM.
+set -eu
+self="$0"
+FX="$(CDPATH= cd -- "$(dirname -- "$(readlink "$self" 2>/dev/null || echo "$self")")/../fixtures" && pwd)"
+nome="$(basename "$self")"; [ "$nome" != "harness" ] || { nome="$1"; shift; }
+[ -z "${STUB_LOG:-}" ] || printf '%s %s\n' "$nome" "$(printf '%s' "$*" | tr '\n' ' ' | cut -c1-2000)" >> "$STUB_LOG"
+fim=""; p=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in -o) if [ "$nome" = "codex" ]; then fim="$2"; fi ;; esac
+  case "$1" in *"## Tarefa"*|"Responda"*) p="$1" ;; esac
+  shift
+done
+tarefa="$(printf '%s\n' "$p" | awk 'f { print } /^## Tarefa/ { f = 1 }' | sed '/^$/d' | head -1)"
+[ -n "$tarefa" ] || tarefa="$p"
+agente="$(printf '%s\n' "$p" | grep -ioE 'principal product designer|lead software architect|gcp|kubernetes' | head -1 | tr '[:upper:]' '[:lower:]')"
+case "$agente" in *designer*) short=design ;; *kubernetes*) short=k8s ;; gcp) short=gcp ;; *) short=arch ;; esac
+case "$tarefa" in
+  "modo pesquisa"*) f=research.md ;;
+  "modo fact-check"*) f=research-check.md ;;
+  "fase proposta"*) f="proposta-$short.md" ;;
+  "fase ataque"*) f=ataque.md ;;
+  "fase replica"*) f=replica.md ;;
+  "fase decisao"*) f=decision.md ;;
+  "fase sdd"*|"fase revisao"*) f=SDD.md ;;
+  "fase spec"*) f=spec-bundle.md ;;
+  "fase backlog-design"*|"fase backlog-eng"*) f=trilha.md ;;
+  "fase backlog"*) f=BACKLOG.md ;;
+  *"PRONTO"*) f="" ;;
+  *) echo "stub: tarefa desconhecida: $tarefa" >&2; exit 2 ;;
+esac
+if [ -z "$f" ]; then texto=PRONTO
+elif [ "${FAIL_ONCE:-}" = "$f" ] && [ ! -e "$STUB_STATE.$f" ]; then
+  : > "$STUB_STATE.$f"; texto="$(printf 'sem nada util\nlinha\nlinha\nlinha\nlinha\nlinha')"
+else texto="$(cat "$FX/$f")"; fi
+case "$nome" in
+  claude|cursor-agent|droid) printf '%s' "$texto" | jq -Rs '{type:"result",is_error:false,result:.}' -c ;;
+  gemini|agy) printf '%s' "$texto" | jq -Rs '{response:.,stats:{}}' -c ;;
+  qwen) printf '%s' "$texto" | jq -Rs '[{type:"system"},{type:"result",result:.}]' -c ;;
+  codex) printf '%s\n' "$texto" > "$fim"; echo "progresso que nao e resposta" ;;
+  *) printf '%s\n' "$texto" ;;
+esac

@@ -6,7 +6,7 @@ IDEA="${1:?uso: new-debate.sh \"sua ideia\" [dest-cases]}"
 BASE="${2:-cases}"
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 REF="$SCRIPT_DIR/../references"
-TEMPLATES="brief-template.md sdd-template.md constitution-template.md regras-debate.md visual-contract.md research-template.md adr-template.md backlog-template.md lapidacao.md"
+TEMPLATES="brief-template.md sdd-template.md constitution-template.md regras-debate.md visual-contract.md research-template.md adr-template.md backlog-template.md lapidacao.md spec-template.md plan-template.md tasks-template.md"
 for f in $TEMPLATES; do
   [ -f "$REF/$f" ] || { echo "erro: referencia ausente: $REF/$f" >&2; exit 2; }
 done
@@ -25,6 +25,6 @@ mkdir -p "$OUT/proposals" "$OUT/critiques" "$OUT/raw" "$OUT/adr" "$OUT/backlog" 
 printf '# Ideia\n\n%s\n' "$IDEA" > "$OUT/idea.md"
 cp "$REF/brief-template.md" "$OUT/brief.md"
 cp "$REF/constitution-template.md" "$OUT/constitution.md"
-for f in sdd-template.md regras-debate.md visual-contract.md research-template.md adr-template.md backlog-template.md lapidacao.md; do cp "$REF/$f" "$OUT/$f"; done
+for f in sdd-template.md regras-debate.md visual-contract.md research-template.md adr-template.md backlog-template.md lapidacao.md spec-template.md plan-template.md tasks-template.md; do cp "$REF/$f" "$OUT/$f"; done
 printf 'ideia: %s\ndata: %s\npainel: %s\n' "$IDEA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${PAINEL:-debate-arch debate-design debate-gcp debate-k8s}" > "$OUT/meta.txt"
 printf '%s\n' "$OUT"

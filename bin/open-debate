@@ -1,5 +1,5 @@
 #!/bin/sh
-# open-debate - CLI: instala o /debate no opencode e expoe os scripts do protocolo.
+# open-debate - CLI: instala o /debate nos harnesses e executa o protocolo.
 set -eu
 
 self="$0"
@@ -9,8 +9,10 @@ while [ -L "$self" ]; do
 done
 ROOT="$(CDPATH= cd -- "$(dirname -- "$self")/.." && pwd)"
 TEMPLATE="$ROOT/template"
-SKILL="skills/architect-debate"
-PKG_SCRIPTS="$TEMPLATE/$SKILL/scripts"
+SKILL="architect-debate"
+PKG_SCRIPTS="$TEMPLATE/skills/$SKILL/scripts"
+. "$ROOT/lib/harnesses.sh"
+. "$ROOT/lib/render.sh"
 . "$ROOT/lib/install.sh"
 
 version() { sed -n 's/^[[:space:]]*"version":[[:space:]]*"\([^"]*\)".*/\1/p' "$ROOT/package.json" | head -1; }
@@ -19,24 +21,29 @@ usage() {
   cat <<EOF
 open-debate $(version) - de uma ideia a SDD, ADRs, tokens, specs e backlog, por debate entre agents
 
-Instalacao no opencode:
-  open-debate init [--project] [--force]       instala agents, /debate e skill
-  open-debate update [--project] [--force]     atualiza preservando modelos e edicoes
-  open-debate uninstall [--project] [--force]  remove o que foi instalado
-  open-debate doctor [--project]               confere dependencias, instalacao e modelos
-  open-debate models [check|apply|free] [--project]
+Instalação:
+  open-debate init [opções]                 instala nos harnesses detectados
+  open-debate update [opções]               atualiza preservando modelos e edições
+  open-debate uninstall [opções]            remove o que foi instalado
+  open-debate doctor [--live] [opções]      confere dependências, instalação e, com --live, faz 1 chamada real
+  open-debate harnesses                     lista harnesses suportados e o estado de cada um
+  open-debate models [check|apply|free]     modelos do opencode
 
-Casos (modo CLI, para modelo pago ou proprio; na sessao use /debate):
-  open-debate new "<ideia>" [dest]             cria o caso, default dest=cases
-  open-debate run <caso> [rounds]              fases 1-6, e 8 com specs preenchidas
-  open-debate specs <caso> <slug> [slug...]    cria specs/<nn>-<slug>/
-  open-debate gate <caso> <fase> [agent...]    roda o gate de 1 fase
-  open-debate validate <caso> [--brief]        roda todos os gates do caso
-  open-debate backlog <caso>                   exporta CSV, JSON e script gh
-  open-debate tile <caso> [fonte.md]           gera style-tile.html e tokens
+  Opções: --harness a,b  --all  --project  --force  --yes
 
---project usa ./.opencode em vez de ~/.config/opencode.
-Env do run: MODEL, MODEL_FALLBACK, PAINEL, RETRIES, TIMEOUT, RESEARCH, FACTCHECK, REVIEW, REPAIR, FRESH.
+Casos:
+  open-debate new "<ideia>" [dest]          cria o caso, default dest=cases
+  open-debate run <caso> [opções]           executa o protocolo inteiro, até o backlog
+  open-debate specs <caso> <slug> [slug...] cria specs/<nn>-<slug>/ à mão
+  open-debate gate <caso> <fase> [agent...] roda o gate de 1 fase
+  open-debate validate <caso> [--brief]     roda todos os gates do caso
+  open-debate backlog <caso>                exporta CSV, JSON e script gh
+  open-debate tile <caso> [fonte.md]        gera style-tile.html e tokens
+
+  Opções do run: --harness x  --mesa a,b,c  --painel arch,design  --rounds 1-3
+
+--mesa distribui o painel entre harnesses diferentes: cada um opina com outro modelo.
+Env do run: MODEL, MODEL_FALLBACK, HARNESS, HARNESS_CMD, ROTAS, MESA, PAINEL, RETRIES, TIMEOUT, RESEARCH, FACTCHECK, SPECS, REVIEW, REPAIR, FRESH.
 EOF
 }
 
@@ -49,38 +56,132 @@ need_args() {
   [ "$1" -ge "$2" ] || { usage >&2; exit 2; }
 }
 
+csv() { printf '%s' "$1" | tr ',' ' '; }
+
+instalados() {
+  for h in $HARNESSES; do resolve_target "$h"; if [ -f "$MANIFEST" ]; then printf '%s ' "$h"; fi; done
+}
+
+# alvos <comando>: harnesses sobre os quais o comando atua.
+alvos() {
+  if [ "$ALL" = "1" ]; then printf '%s' "$HARNESSES"; return; fi
+  if [ -n "$ESCOLHA" ]; then printf '%s' "$ESCOLHA"; return; fi
+  case "$1" in
+    init) detected_list ;;
+    doctor) printf '%s' "$HARNESSES" ;;
+    *) instalados ;;
+  esac
+}
+
+confirma() {
+  [ "$YES" = "0" ] && [ -t 0 ] && [ -z "$ESCOLHA" ] && [ "$ALL" = "0" ] || return 0
+  printf 'Instalar em: %s? [S/n] ' "$1"
+  read -r r || r=""
+  case "$r" in n*|N*) echo "cancelado; escolha com --harness a,b"; exit 1 ;; esac
+}
+
+em_cada() {
+  cmd="$1"; lista="$2"; rc=0; agents_dir=""
+  for h in $lista; do
+    # No projeto, codex e agy leem o mesmo .agents/skills: so 1 entrada /debate cabe ali.
+    if [ "$PROJECT" = "1" ] && [ "$cmd" != "uninstall" ]; then
+      case "$h" in
+        codex|agy)
+          if [ -n "$agents_dir" ]; then
+            echo "aviso: $h e $agents_dir dividem .agents/skills no projeto, mantida a entrada de $agents_dir; $h segue disponivel por: open-debate run --harness $h"
+            continue
+          fi
+          agents_dir="$h" ;;
+      esac
+    fi
+    resolve_target "$h"
+    case "$cmd" in
+      init|update) do_install "$cmd" || rc=$? ;;
+      uninstall) do_uninstall || rc=$? ;;
+    esac
+  done
+  return "$rc"
+}
+
+padrao_run() {
+  for h in claude codex gemini agy omp droid cursor copilot qwen dsh pi cline opencode; do
+    h_load "$h"
+    if h_bin >/dev/null; then printf '%s' "$h"; return 0; fi
+  done
+  return 1
+}
+
+cmd_run() {
+  caso=""; rounds=""
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --harness) HARNESS="$2"; shift 2 ;;
+      --mesa) MESA="$(csv "$2")"; shift 2 ;;
+      --rounds) rounds="$2"; shift 2 ;;
+      --painel) PAINEL=""; for a in $(csv "$2"); do PAINEL="$PAINEL debate-$a"; done; PAINEL="${PAINEL# }"; shift 2 ;;
+      -*) echo "erro: opcao desconhecida: $1" >&2; exit 2 ;;
+      *) if [ -z "$caso" ]; then caso="$1"; else rounds="$1"; fi; shift ;;
+    esac
+  done
+  [ -n "$caso" ] || { usage >&2; exit 2; }
+  if [ -z "${HARNESS:-}" ]; then
+    HARNESS="$(sed -n 's/^harness: //p' "$caso/meta.txt" 2>/dev/null | tail -1)"
+    [ -n "$HARNESS" ] || HARNESS="$(padrao_run)" || { echo "erro: nenhum harness encontrado no PATH (veja: open-debate harnesses)" >&2; exit 2; }
+  fi
+  export HARNESS MESA="${MESA:-}"
+  [ -z "${PAINEL:-}" ] || export PAINEL
+  if [ "$HARNESS" = "opencode" ]; then
+    PROJECT=0; resolve_target opencode
+    if [ ! -f "$MANIFEST" ] && [ ! -f "$TARGET/agents/debate-judge.md" ]; then
+      PROJECT=1; resolve_target opencode
+    fi
+    [ -f "$TARGET/agents/debate-judge.md" ] || { echo "erro: agents do debate nao instalados, rode: open-debate init" >&2; exit 2; }
+  fi
+  if [ -n "$rounds" ]; then run_script debate.sh "$caso" "$rounds"; else run_script debate.sh "$caso"; fi
+}
+
 cmd="${1:-help}"
 [ "$#" -eq 0 ] || shift
 case "$cmd" in
   -h|--help|help) usage ;;
   -v|--version|version) version ;;
-  init|update|uninstall|doctor|models)
-    PROJECT=0; FORCE=0; ARG=""
-    for a in "$@"; do
-      case "$a" in
+  init|update|uninstall|doctor|models|harnesses)
+    PROJECT=0; FORCE=0; ARG=""; ALL=0; YES=0; ESCOLHA=""; LIVE=0
+    while [ "$#" -gt 0 ]; do
+      case "$1" in
         --project) PROJECT=1 ;;
         --force) FORCE=1 ;;
-        -*) echo "erro: opcao desconhecida: $a" >&2; exit 2 ;;
-        *) ARG="$a" ;;
+        --all) ALL=1 ;;
+        --yes|-y) YES=1 ;;
+        --live) LIVE=1 ;;
+        --harness) [ "$#" -ge 2 ] || { echo "erro: --harness pede uma lista" >&2; exit 2; }; ESCOLHA="$(csv "$2")"; shift ;;
+        --harness=*) ESCOLHA="$(csv "${1#--harness=}")" ;;
+        -*) echo "erro: opcao desconhecida: $1" >&2; exit 2 ;;
+        *) ARG="$1" ;;
       esac
+      shift
     done
-    resolve_target
+    lista="$(alvos "$cmd")"
     case "$cmd" in
-      init) do_install init ;;
-      update) do_install update ;;
-      uninstall) do_uninstall ;;
-      doctor) do_doctor ;;
+      init)
+        if [ -z "$lista" ]; then
+          echo "erro: nenhum harness detectado. Instale um ou escolha com --harness a,b. Suportados: $HARNESSES" >&2; exit 2
+        fi
+        confirma "$lista"; em_cada init "$lista" ;;
+      update|uninstall)
+        [ -n "$lista" ] || { echo "erro: nada instalado, rode: open-debate init" >&2; exit 2; }
+        em_cada "$cmd" "$lista" ;;
+      doctor)
+        rc=0; do_doctor "$lista" || rc=$?
+        if [ "$LIVE" = "1" ]; then
+          for h in $(instalados); do h_load "$h"; if h_bin >/dev/null; then "$PKG_SCRIPTS/probe.sh" "$h" || rc=1; fi; done
+        fi
+        exit "$rc" ;;
       models) do_models "${ARG:-check}" ;;
+      harnesses) do_harnesses ;;
     esac ;;
   new) need_args "$#" 1; run_script new-debate.sh "$@" ;;
-  run)
-    need_args "$#" 1
-    PROJECT=0; resolve_target
-    if [ ! -f "$MANIFEST" ] && [ ! -f "$TARGET/agents/debate-judge.md" ]; then
-      PROJECT=1; resolve_target
-    fi
-    [ -f "$TARGET/agents/debate-judge.md" ] || { echo "erro: agents do debate nao instalados, rode: open-debate init" >&2; exit 2; }
-    run_script debate.sh "$@" ;;
+  run) need_args "$#" 1; cmd_run "$@" ;;
   specs) need_args "$#" 2; run_script make-specs.sh "$@" ;;
   gate) need_args "$#" 2; run_script gate.sh "$@" ;;
   validate) need_args "$#" 1; run_script validate.sh "$@" ;;

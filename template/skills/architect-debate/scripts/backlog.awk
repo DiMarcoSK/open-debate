@@ -20,7 +20,7 @@ function caminho(id,  n, i, d, v, melhor, ds) {
   if (id in fase) dup[id] = 1
   ordem[n] = id; fase[id] = f; feito[id] = (l ~ /^- \[[xX]\]/) ? "feito" : "aberto"
   r = substr(l, RSTART + RLENGTH); bloq[id] = (r ~ /^[[:space:]]*\[P\]/) ? "sim" : "nao"; sub(/^[[:space:]]*\[P\][[:space:]]*/, "", r)
-  meta = ""; if (match(r, /\{[^}]*\}/)) { meta = substr(r, RSTART + 1, RLENGTH - 2); r = substr(r, 1, RSTART - 1) substr(r, RSTART + RLENGTH) }
+  meta = ""; if (match(r, /\{[^{}]*\}[[:space:]]*$/)) { meta = substr(r, RSTART + 1, RLENGTH - 2); r = substr(r, 1, RSTART - 1) substr(r, RSTART + RLENGTH) }
   orig[id] = ""; if (match(r, /\([^()]*(spec|ADR-|SDD)[^()]*\)/)) { orig[id] = substr(r, RSTART + 1, RLENGTH - 2); r = substr(r, 1, RSTART - 1) substr(r, RSTART + RLENGTH) }
   ac[id] = ""; if (match(r, /Aceite:/)) { ac[id] = limpa(substr(r, RSTART + 7)); r = substr(r, 1, RSTART - 1) }
   sub(/\[[^]]*\][[:space:]]*$/, "", ac[id]); tit[id] = limpa(r); sub(/\.$/, "", tit[id]); ac[id] = limpa(ac[id])

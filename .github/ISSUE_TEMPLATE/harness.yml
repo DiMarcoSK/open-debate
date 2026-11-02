@@ -1,0 +1,24 @@
+name: Harness problem
+description: /debate or run failed on a specific harness
+labels: [harness]
+body:
+  - type: input
+    id: harness
+    attributes:
+      label: Harness and version
+      placeholder: codex 1.2.3
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of open-debate doctor --live --harness <id>
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+    validations:
+      required: true

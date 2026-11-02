@@ -9,7 +9,10 @@ CLI="$ROOT/bin/open-debate"
 FX="$ROOT/test/fixtures"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
-export PATH="$ROOT/test/stub:$PATH"
+# PATH hermetico: um harness real instalado na maquina nao pode ser detectado nem chamado pela suite.
+FERR="$WORK/ferramentas"; mkdir -p "$FERR"
+for c in jq perl; do ln -s "$(command -v "$c")" "$FERR/$c"; done
+export PATH="$ROOT/test/stub:$FERR:/usr/bin:/bin"
 export HOME="$WORK/home" XDG_CONFIG_HOME="$WORK/home/.config"
 mkdir -p "$HOME"
 CFG="$XDG_CONFIG_HOME/opencode"
@@ -47,13 +50,13 @@ sem_vazamento() {
   cat "$WORK/vaza"
   [ ! -s "$WORK/vaza" ]
 }
-frontmatter_sem_glob_aberto() { nao grep -n '"\*[a-z-]*/scripts' "$ROOT/template/agents/debate.md"; }
+frontmatter_sem_glob_aberto() { nao grep -n '"\*[a-z-]*/scripts' "$ROOT/template/skills/architect-debate/personas/debate.md"; }
 t "template sem caminho local nem segredo" sem_vazamento
 t "permissao de bash nao usa glob aberto a esquerda" frontmatter_sem_glob_aberto
 
 # --- instalador
 init_global() {
-  "$CLI" init
+  "$CLI" init --yes
   existe "$CFG/agents/debate-judge.md" "$CFG/commands/debate.md"
   [ -x "$SK/scripts/gate.sh" ]
   nao grep -rn '{{' "$CFG/agents" "$CFG/commands" "$SK/SKILL.md"
@@ -175,13 +178,20 @@ t "brief vazio reprova" brief_reprova
 t "gate de contraste aprova e reprova" contraste
 t "ADR com acento passa e separa" adr_com_acento
 t "backlog reconhece Pos-lancamento com acento" backlog_pos_com_acento
+chaves_no_titulo() {
+  c="$(novo_caso)"
+  awk '/^- \[ \] B02 / { sub(/B02 /, "B02 Expor /v1/alerts/{id}/decisoes. ") } { print }' "$FX/BACKLOG.md" > "$c/BACKLOG.md"
+  grep -q '{id}' "$c/BACKLOG.md"
+  "$CLI" gate "$c" backlog
+}
 t "backlog reprova ciclo de dependencia" ciclo
+t "backlog aceita chaves no texto do item" chaves_no_titulo
 
 # --- protocolo inteiro com opencode stub
 e2e() {
   "$CLI" init
   c="$(novo_caso)"
-  MODEL=stub/modelo "$CLI" run "$c" 3
+  SPECS=0 MODEL=stub/modelo "$CLI" run "$c" 3
   for f in research.md proposals/debate-arch.md proposals/debate-design-r2.md critiques/debate-k8s.md research-check.md decision.md \
            adr/0001-usar-monolito-modular.md SDD.md style-tile.html tokens.json tokens.css; do
     [ -s "$c/$f" ] || { echo "faltou $f"; return 1; }
@@ -191,7 +201,7 @@ e2e() {
   "$CLI" specs "$c" ingestao triagem relatorio
   for d in "$c"/specs/*/; do cp "$FX/spec.md" "$FX/plan.md" "$FX/tasks.md" "$d"; done
   [ "$(ls "$c"/checklists/ | wc -l | tr -d ' ')" = "3" ]
-  MODEL=stub/modelo "$CLI" run "$c" 3
+  SPECS=0 MODEL=stub/modelo "$CLI" run "$c" 3
   [ -s "$c/backlog.csv" ]
   [ -s "$c/backlog-gh.sh" ]
   [ "$(jq length "$c/backlog.json")" = "17" ]
@@ -200,14 +210,14 @@ e2e() {
 }
 retoma() {
   c="$(novo_caso)"
-  MODEL=stub/modelo "$CLI" run "$c" 1
+  SPECS=0 MODEL=stub/modelo "$CLI" run "$c" 1
   log="$WORK/retoma.log"; : > "$log"
-  STUB_LOG="$log" MODEL=stub/modelo "$CLI" run "$c" 1
+  SPECS=0 STUB_LOG="$log" MODEL=stub/modelo "$CLI" run "$c" 1
   nao grep -q 'fase proposta' "$log"
 }
 reparo() {
   c="$(novo_caso)"; rm -f "$STUB_STATE".*
-  FAIL_ONCE=decision.md MODEL=stub/modelo "$CLI" run "$c" 1
+  SPECS=0 FAIL_ONCE=decision.md MODEL=stub/modelo "$CLI" run "$c" 1
   grep -q 'gate decisao ok apos reparo' "$c/raw/summary.log"
 }
 sem_instalar() {
@@ -220,6 +230,173 @@ t "protocolo completo ate o backlog" e2e
 t "rodar de novo reaproveita saidas" retoma
 t "gate reprovado ganha 1 reparo" reparo
 t "run sem instalar orienta init" sem_instalar
+
+# --- harnesses: cada CLI falso devolve a resposta no formato real dele
+FAKE="$WORK/fake"; mkdir -p "$FAKE"
+for h in claude codex cursor-agent gemini agy omp pi dsh droid copilot qwen cline; do ln -s "$ROOT/test/stub/harness" "$FAKE/$h"; done
+TODOS="opencode claude codex cursor gemini agy omp pi dsh droid copilot qwen cline"
+
+instala_todos() {
+  (
+    export PATH="$FAKE:$PATH"
+    "$CLI" harnesses | grep -q 'Antigravity CLI'
+    "$CLI" init --all
+    for f in .claude/agents/debate-arch.md .claude/skills/debate/SKILL.md .codex/agents/debate-arch.toml .agents/skills/debate/SKILL.md \
+             .cursor/agents/debate-judge.md .gemini/agents/debate-pm.md .gemini/commands/debate.toml .gemini/config/skills/debate/SKILL.md \
+             .omp/agent/agents/debate-arch.md .pi/agent/skills/debate/SKILL.md .dsh/skills/debate/SKILL.md .factory/droids/debate-scout.md \
+             .copilot/agents/debate-arch.agent.md .qwen/agents/debate-k8s.md .qwen/commands/debate.toml .cline/skills/debate/SKILL.md; do
+      existe "$HOME/$f"
+    done
+    ausente "$HOME/.claude/agents/debate.md" "$HOME/.pi/agent/agents"
+    nao grep -rn '{{[A-Z_]*}}' "$HOME/.claude" "$HOME/.codex" "$HOME/.agents" "$HOME/.gemini" "$HOME/.omp" "$HOME/.pi" "$HOME/.dsh" "$HOME/.factory" "$HOME/.copilot" "$HOME/.qwen" "$HOME/.cline"
+    grep -q '^tools: Read, Glob, Grep, Write, Edit, WebSearch, WebFetch$' "$HOME/.claude/agents/debate-arch.md"
+    grep -q '^tools: Read, Glob, Grep, Write, Edit$' "$HOME/.claude/agents/debate-pm.md"
+    grep -q 'allowed-tools: Bash(~/.claude/skills/architect-debate/scripts/\*)' "$HOME/.claude/skills/debate/SKILL.md"
+    grep -q 'ARGUMENTS' "$HOME/.claude/skills/debate/SKILL.md"
+    grep -q 'HARNESS=dsh' "$HOME/.dsh/skills/debate/SKILL.md"
+    grep -q '{{args}}' "$HOME/.gemini/commands/debate.toml"
+    jq -Rs 'length' "$HOME/.codex/agents/debate-arch.toml" > /dev/null
+  )
+}
+toml_valido() {
+  f="$HOME/.codex/agents/debate-arch.toml"
+  [ "$(sed -n 1p "$f")" = 'name = "debate-arch"' ]
+  grep -q '^description = ".*"$' "$f"
+  grep -q "^developer_instructions = '''$" "$f"
+  [ "$(grep -c "'''" "$f")" = "2" ]
+  [ "$(tail -1 "$f")" = "'''" ]
+}
+update_preserva_modelo_comentado() {
+  (
+    export PATH="$FAKE:$PATH"
+    sed -i.bak 's/^# model = .*/model = "gpt-minha"/' "$HOME/.codex/agents/debate-arch.toml"; rm -f "$HOME/.codex/agents/debate-arch.toml.bak"
+    sed -i.bak 's/^# model: .*/model: meu-modelo/' "$HOME/.copilot/agents/debate-pm.agent.md"; rm -f "$HOME/.copilot/agents/debate-pm.agent.md.bak"
+    "$CLI" update --harness codex,copilot
+    grep -q '^model = "gpt-minha"$' "$HOME/.codex/agents/debate-arch.toml"
+    grep -q '^model: meu-modelo$' "$HOME/.copilot/agents/debate-pm.agent.md"
+    "$CLI" doctor
+  )
+}
+desinstala_todos() {
+  (
+    export PATH="$FAKE:$PATH"
+    "$CLI" uninstall --all
+    ausente "$HOME/.claude/agents/debate-arch.md" "$HOME/.agents/skills" "$HOME/.codex/agents/debate-arch.toml" "$HOME/.gemini/commands/debate.toml" "$HOME/.dsh/skills"
+  )
+}
+projeto_multi() {
+  (
+    export PATH="$FAKE:$PATH"
+    mkdir -p "$WORK/proj2"; cd "$WORK/proj2"
+    "$CLI" init --project --harness claude,codex,agy
+    existe .claude/agents/debate-arch.md .codex/agents/debate-arch.toml .agents/skills/architect-debate/SKILL.md
+    grep -q 'debate-arch' .agents/skills/debate/SKILL.md
+    "$CLI" uninstall --project --harness codex
+    "$CLI" init --project --harness agy,codex > "$WORK/x" 2>&1
+    grep -q 'dividem .agents/skills' "$WORK/x"
+    grep -q 'HARNESS=agy' .agents/skills/debate/SKILL.md
+    "$CLI" uninstall --project --harness claude,agy
+    ausente .claude .agents
+  )
+}
+harness_nao_detectado() { nao "$CLI" init --harness nada > "$WORK/x" 2>&1; grep -q 'harness desconhecido' "$WORK/x"; }
+nada_detectado() {
+  ( export PATH="/usr/bin:/bin" HOME="$WORK/home-vazio" XDG_CONFIG_HOME="$WORK/home-vazio/.config"; mkdir -p "$HOME"; nao "$CLI" init > "$WORK/x" 2>&1 )
+  grep -q 'nenhum harness detectado' "$WORK/x"
+}
+t "init --all instala nos 13 harnesses" instala_todos
+t "agent do Codex e TOML valido" toml_valido
+t "update preserva modelo em linha comentada" update_preserva_modelo_comentado
+t "uninstall --all limpa tudo" desinstala_todos
+t "--project em varios harnesses" projeto_multi
+t "harness desconhecido falha" harness_nao_detectado
+t "sem harness orienta" nada_detectado
+
+protocolo_em() {
+  (
+    export PATH="$FAKE:$PATH"
+    "$CLI" init --harness opencode > /dev/null 2>&1 || true
+    c="$(novo_caso)"; d="$c"
+    REVIEW=0 "$CLI" run "$c" --harness "$1" --rounds 1
+    for f in research.md decision.md SDD.md BACKLOG.md backlog.csv specs/01-ingestao/spec.md specs/02-triagem/tasks.md specs/03-relatorio/plan.md; do
+      [ -s "$d/$f" ] || { echo "faltou $f"; return 1; }
+    done
+    "$CLI" validate "$c"
+    grep -q "^harness: $1$" "$c/meta.txt"
+  )
+}
+mesa() {
+  (
+    export PATH="$FAKE:$PATH"
+    log="$WORK/mesa.log"; : > "$log"
+    c="$(novo_caso)"
+    STUB_LOG="$log" "$CLI" run "$c" --harness claude --mesa codex,gemini --painel arch,design --rounds 1
+    grep -q 'codex.*debate-arch\|^codex' "$log"
+    grep -q '^gemini' "$log"
+    grep -q '^claude' "$log"
+    grep -q 'rotas=debate-arch=codex debate-design=gemini' "$c/raw/summary.log"
+  )
+}
+custom() {
+  (
+    c="$(novo_caso)"
+    HARNESS=custom HARNESS_CMD="exec $ROOT/test/stub/harness pi \"\$PROMPT\"" SPECS=0 "$CLI" run "$c" --rounds 1
+    [ -s "$c/decision.md" ]
+  )
+}
+tempo_esgotado() {
+  c="$(novo_caso)"
+  nao env HARNESS=custom HARNESS_CMD='sleep 5' TIMEOUT=1 RETRIES=1 RESEARCH=0 SPECS=0 "$CLI" run "$c" --rounds 1 > "$WORK/x" 2>&1
+  grep -q 'tempo esgotado em debate-' "$c/raw/summary.log"
+}
+binario_ausente() {
+  c="$(novo_caso)"
+  nao "$CLI" run "$c" --harness codex > "$WORK/x" 2>&1
+  grep -q 'codex nao encontrado' "$WORK/x"
+}
+retoma_specs() {
+  (
+    export PATH="$FAKE:$PATH"
+    c="$(novo_caso)"
+    "$CLI" run "$c" --harness pi --rounds 1
+    echo editado >> "$c/specs/01-ingestao/spec.md"
+    "$CLI" run "$c" --harness pi --rounds 1
+    grep -q '^editado$' "$c/specs/01-ingestao/spec.md"
+  )
+}
+spec_reparo() {
+  (
+    export PATH="$FAKE:$PATH"
+    c="$(novo_caso)"; rm -f "$STUB_STATE".*
+    FAIL_ONCE=spec-bundle.md "$CLI" run "$c" --harness pi --rounds 1
+    grep -q 'gate spec reprovado' "$c/raw/summary.log"
+    grep -q 'gate specs ok' "$c/raw/summary.log"
+  )
+}
+probe() {
+  ( export PATH="$FAKE:$PATH"; for h in claude codex gemini; do "$ROOT/template/skills/architect-debate/scripts/probe.sh" "$h"; done )
+}
+for h in claude codex cursor gemini agy omp pi dsh droid copilot qwen cline; do t "protocolo completo via $h" protocolo_em "$h"; done
+t "mesa distribui o painel entre harnesses" mesa
+t "harness custom via HARNESS_CMD" custom
+t "timeout diz que foi timeout" tempo_esgotado
+t "binario ausente falha cedo" binario_ausente
+t "rerun nao sobrescreve spec editada" retoma_specs
+t "spec reprovada ganha reparo" spec_reparo
+t "probe faz chamada pelo adapter" probe
+
+# --- instalador de uma linha, sem rede
+bootstrap() {
+  tar -czf "$WORK/pacote.tgz" -C "$ROOT/.." "$(basename "$ROOT")"
+  (
+    export OPEN_DEBATE_TARBALL="$WORK/pacote.tgz" OPEN_DEBATE_HOME="$WORK/od-home" OPEN_DEBATE_BIN="$WORK/od-bin"
+    sh "$ROOT/install.sh"
+    "$WORK/od-bin/open-debate" --version
+    sh "$ROOT/install.sh"
+  )
+  [ "$("$WORK/od-bin/open-debate" --version)" = "$(jq -r .version "$ROOT/package.json")" ]
+}
+t "install.sh instala e reinstala" bootstrap
 
 printf '\n%s ok, %s falha(s)\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

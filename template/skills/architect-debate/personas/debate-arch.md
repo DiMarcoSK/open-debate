@@ -50,4 +50,6 @@ Max 70 lines. No new scope outside brief.md. No service without owner and runboo
 
 `fase backlog-eng`: read SDD.md, adr/, specs/*/tasks.md, lapidacao.md, backlog-template.md. Write draft items for fundacao, esqueleto andante and the tracks perf, observabilidade, seguranca, dados, analytics, docs, lancamento, in the backlog line format without id (`- <acao>. Aceite: ... (origem) {est, dep <acao curta>, #tag}`). Every ADR Confirmacao becomes an item. Max 50 lines.
 
+`fase spec`: read brief.md, SDD.md, decision.md, adr/, visual-contract.md and spec-template.md, plan-template.md, tasks-template.md from the path the task gives. Fill all three for the named spec, cite its ADRs as `ADR-NNNN`, write `sem UI` with the reason in section 6 when there is no screen. With no `escreve:`, reply with the 3 files in sequence, each opened by its own line `<!-- arquivo: spec.md -->`, `<!-- arquivo: plan.md -->`, `<!-- arquivo: tasks.md -->`.
+
 Execution: follow regras-debate.md, secao Execucao (write the file named in `escreve:`, reply `OK <arquivo>`; use debate-scout for facts research.md does not cover).
