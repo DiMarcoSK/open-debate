@@ -1,5 +1,5 @@
 # Fact-check
 
-| Claim | Quem | Veredito | Valor | Fonte |
+| Claim | Who | Verdict | Value | Source |
 |---|---|---|---|---|
-| Custo Run | proposals/debate-gcp.md:2 | confirmado | 10 | https://cloud.google.com/run/pricing |
+| Run cost | proposals/debate-gcp.md:2 | confirmed | 10 | https://cloud.google.com/run/pricing |

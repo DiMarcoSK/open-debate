@@ -1,8 +1,8 @@
-# harness.sh - chamada headless de cada harness (source de debate.sh e probe.sh). Requer TO, SCRIPT_DIR.
-# Todo harness recebe a persona dentro do prompt, entao nada precisa estar instalado nele.
-# Fora do opencode a chamada e somente leitura: quem grava o arquivo e o debate.sh, a partir do texto devolvido.
+# harness.sh - headless call of each harness (sourced by debate.sh and probe.sh). Needs TO, SCRIPT_DIR.
+# Every harness gets the persona inside the prompt, so nothing needs to be installed in it.
+# Outside opencode the call is read-only: debate.sh writes the file, from the returned text.
 
-h_binario() {
+h_binary() {
   case "$1" in
     cursor) if command -v cursor-agent >/dev/null 2>&1; then printf cursor-agent; else printf agent; fi ;;
     custom) printf sh ;;
@@ -11,18 +11,18 @@ h_binario() {
   esac
 }
 
-h_existe() {
-  b="$(h_binario "$1")" || { echo "erro: harness desconhecido: $1" >&2; return 2; }
-  command -v "$b" >/dev/null 2>&1 || { echo "erro: $b nao encontrado no PATH" >&2; return 2; }
-  if [ "$1" = "custom" ] && [ -z "${HARNESS_CMD:-}" ]; then echo "erro: HARNESS=custom exige HARNESS_CMD" >&2; return 2; fi
+h_exists() {
+  b="$(h_binary "$1")" || { echo "error: unknown harness: $1" >&2; return 2; }
+  command -v "$b" >/dev/null 2>&1 || { echo "error: $b not found on PATH" >&2; return 2; }
+  if [ "$1" = "custom" ] && [ -z "${HARNESS_CMD:-}" ]; then echo "error: HARNESS=custom needs HARNESS_CMD" >&2; return 2; fi
 }
 
 persona() { awk 'c >= 2 { print } /^---$/ { c++ }' "$SCRIPT_DIR/../personas/$1.md"; }
 
-h_prompt() { printf '%s\n\n## Tarefa\n\n%s\n' "$(persona "$1")" "$2"; }
+h_prompt() { printf '%s\n\n## Task\n\n%s\n' "$(persona "$1")" "$2"; }
 
-# h_chama: a chamada em si. stdin fechado, porque varios CLIs esperam entrada por pipe e travam.
-h_chama() {
+# h_call: the call itself. stdin closed, because several CLIs wait for piped input and hang.
+h_call() {
   (
     cd "$di"
     case "$h" in
@@ -41,7 +41,7 @@ h_chama() {
       cursor)
         set -- -p --output-format json
         [ -z "$mo" ] || set -- "$@" --model "$mo"
-        exec $TO "$(h_binario cursor)" "$@" "$ta" ;;
+        exec $TO "$(h_binary cursor)" "$@" "$ta" ;;
       gemini)
         set -- --output-format json --approval-mode plan
         [ -z "$mo" ] || set -- "$@" -m "$mo"
@@ -76,22 +76,22 @@ h_chama() {
         [ -z "$mo" ] || set -- "$@" -m "$mo"
         exec $TO cline "$@" "$ta" ;;
       custom) PROMPT="$ta" MODEL="$mo" exec $TO sh -c "$HARNESS_CMD" ;;
-      *) echo "harness desconhecido: $h" >&2; exit 2 ;;
+      *) echo "unknown harness: $h" >&2; exit 2 ;;
     esac
   ) < /dev/null > "$ra" 2> "$ra.stderr"
 }
 
-# h_run <harness> <agent> <tarefa> <modelo> <dir> <saida-bruta>; stderr vai para <saida-bruta>.stderr
-# A chamada fica em funcao propria: em dash, redirecionar um grupo em volta do subshell descarta os redirecionamentos internos.
-# O 2>/dev/null aqui cala o aviso do shell quando o alarme do TIMEOUT mata a chamada.
+# h_run <harness> <agent> <task> <model> <dir> <raw-output>; stderr goes to <raw-output>.stderr
+# The call lives in its own function: in dash, redirecting a group around the subshell drops the inner redirections.
+# The 2>/dev/null here silences the shell notice when the TIMEOUT alarm kills the call.
 h_run() {
   h="$1"; ag="$2"; ta="$3"; mo="$4"; di="$5"; ra="$6"
   [ "$h" = "opencode" ] || ta="$(h_prompt "$ag" "$ta")"
-  h_chama 2>/dev/null
+  h_call 2>/dev/null
 }
 
-# h_texto <harness> <saida-bruta> <destino>: extrai a resposta final.
-h_texto() {
+# h_text <harness> <raw-output> <dest>: extracts the final answer.
+h_text() {
   case "$1" in
     opencode)
       jq -r 'select(.type == "text") | .part.text // empty' "$2" > "$3" 2>/dev/null || true
@@ -108,9 +108,9 @@ h_texto() {
   [ -s "$3" ]
 }
 
-# h_falha <saida-bruta>: o que resta da saida depois de uma chamada que falhou. So o fim: uma proposta pode falar de rate limit.
-h_falha() { { tail -c 2000 "$1" 2>/dev/null; tail -c 2000 "$1.stderr" 2>/dev/null; } | tr -d '\000'; }
-# Falha permanente: tentar de novo so gasta tempo. Cada harness escreve de um jeito.
-h_auth_falhou() { h_falha "$1" | grep -qiE 'FreeTierError|Free usage limit|statusCode[^0-9]*40[13]|unauthorized|not logged in|please log ?in|invalid api key|usage limit'; }
-# Falha passageira: passa com espera.
-h_limite_falhou() { h_falha "$1" | grep -qiE '(^|[^0-9])429([^0-9]|$)|rate.?limit|too many requests|overloaded|resource.?exhausted|try again'; }
+# h_failure <raw-output>: what is left of the output after a failed call. Only the tail: a proposal may talk about rate limits.
+h_failure() { { tail -c 2000 "$1" 2>/dev/null; tail -c 2000 "$1.stderr" 2>/dev/null; } | tr -d '\000'; }
+# Permanent failure: retrying only wastes time. Every harness words it differently.
+h_auth_failed() { h_failure "$1" | grep -qiE 'FreeTierError|Free usage limit|statusCode[^0-9]*40[13]|unauthorized|not logged in|please log ?in|invalid api key|usage limit'; }
+# Transient failure: waiting fixes it.
+h_limit_failed() { h_failure "$1" | grep -qiE '(^|[^0-9])429([^0-9]|$)|rate.?limit|too many requests|overloaded|resource.?exhausted|try again'; }

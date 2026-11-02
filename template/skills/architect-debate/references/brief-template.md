@@ -1,15 +1,15 @@
-# Brief - 1 campo por linha, sem paragrafo
+# Brief - 1 field per line, no paragraphs
 
-- Objetivo (1 frase):
-- Quem usa:
-- Metrica de sucesso em 90 dias (numero):
-- Usuarios e req/dia (pico e quando):
-- Drivers de qualidade (top 3, em ordem):
-- Prazo e time:
-- Custo teto/mes:
-- Dados sensiveis e regulacao (LGPD, PCI, outro):
-- Plataforma (web interna/publica, mobile, API):
-- Concorrentes ou referencias de produto:
-- Referencias visuais (produto + o que admira nele):
-- Restricoes fixas:
-- Fora do escopo:
+- Goal (1 sentence):
+- Who uses it:
+- 90-day success metric (number):
+- Users and req/day (peak and when):
+- Quality drivers (top 3, in order):
+- Deadline and team:
+- Cost ceiling/month:
+- Sensitive data and regulation (GDPR, LGPD, PCI, other):
+- Platform (internal/public web, mobile, API):
+- Competitors or product references:
+- Visual references (product + what you admire in it):
+- Fixed constraints:
+- Out of scope:

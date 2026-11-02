@@ -1,19 +1,24 @@
 #!/bin/sh
-# new-debate.sh "sua ideia" [dest-cases] - cria cases/<slug>/ com templates.
-# Nunca sobrescreve caso existente sem OVERWRITE=1.
+# new-debate.sh "your idea" [dest-cases] - creates cases/<slug>/ with the templates. The idea may be in any language.
+# Never overwrites an existing case without OVERWRITE=1.
 set -eu
-IDEA="${1:?uso: new-debate.sh \"sua ideia\" [dest-cases]}"
+IDEA="${1:?usage: new-debate.sh \"your idea\" [dest-cases]}"
 BASE="${2:-cases}"
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 REF="$SCRIPT_DIR/../references"
-TEMPLATES="brief-template.md sdd-template.md constitution-template.md regras-debate.md visual-contract.md research-template.md adr-template.md agenda-template.md auditoria-template.md backlog-template.md lapidacao.md spec-template.md plan-template.md tasks-template.md brandbook-template.md"
-for f in $TEMPLATES; do
-  [ -f "$REF/$f" ] || { echo "erro: referencia ausente: $REF/$f" >&2; exit 2; }
+COPIES="sdd-template.md debate-rules.md visual-contract.md research-template.md adr-template.md agenda-template.md audit-template.md backlog-template.md polish.md spec-template.md plan-template.md tasks-template.md brandbook-template.md"
+for f in brief-template.md constitution-template.md $COPIES; do
+  [ -f "$REF/$f" ] || { echo "error: missing reference: $REF/$f" >&2; exit 2; }
 done
-SLUG="$(printf '%s' "$IDEA" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9][^a-z0-9]*/-/g; s/^-\{1,\}//; s/-\{1,\}$//')"
+# Slug in ASCII: accents are dropped so "Gestão de clínicas" becomes gestao-de-clinicas, not gest-o-de-cl-nicas.
+ascii() {
+  if perl -MUnicode::Normalize -e 1 2>/dev/null; then printf '%s' "$1" | perl -CSD -MUnicode::Normalize -pe '$_ = NFD($_); s/\pM//g'
+  else printf '%s' "$1"; fi
+}
+SLUG="$(ascii "$IDEA" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9][^a-z0-9]*/-/g; s/^-\{1,\}//; s/-\{1,\}$//')"
 SLUG="$(printf '%s' "$SLUG" | awk -F- '{out=""; for(i=1;i<=NF && i<=6;i++) out=(out==""?$i:out"-"$i); print out}')"
 SLUG="$(printf '%s' "$SLUG" | cut -c1-40 | sed 's/-\{1,\}$//')"
-SLUG="${SLUG:-ideia}"
+SLUG="${SLUG:-idea}"
 OUT="$BASE/$SLUG"
 if [ -e "$OUT" ] && [ "${OVERWRITE:-0}" != "1" ]; then
   n=2
@@ -22,11 +27,11 @@ if [ -e "$OUT" ] && [ "${OVERWRITE:-0}" != "1" ]; then
 fi
 if [ -e "$OUT" ] && [ "${OVERWRITE:-0}" = "1" ]; then rm -rf "$OUT"; fi
 mkdir -p "$OUT/proposals" "$OUT/critiques" "$OUT/raw" "$OUT/adr" "$OUT/backlog" "$OUT/specs" "$OUT/checklists"
-printf '# Ideia\n\n%s\n' "$IDEA" > "$OUT/idea.md"
+printf '# Idea\n\n%s\n' "$IDEA" > "$OUT/idea.md"
 cp "$REF/brief-template.md" "$OUT/brief.md"
 cp "$REF/constitution-template.md" "$OUT/constitution.md"
-for f in sdd-template.md regras-debate.md visual-contract.md research-template.md agenda-template.md auditoria-template.md adr-template.md backlog-template.md lapidacao.md spec-template.md plan-template.md tasks-template.md brandbook-template.md; do cp "$REF/$f" "$OUT/$f"; done
-# Sem PAINEL, o painel sai do brief preenchido (painel.sh), nao daqui: o brief ainda esta vazio.
-printf 'ideia: %s\ndata: %s\n' "$IDEA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$OUT/meta.txt"
-[ -z "${PAINEL:-}" ] || printf 'painel: %s\n' "$PAINEL" >> "$OUT/meta.txt"
+for f in $COPIES; do cp "$REF/$f" "$OUT/$f"; done
+# Without PANEL, the panel comes from the filled brief (panel.sh), not from here: the brief is still empty.
+printf 'idea: %s\ndate: %s\n' "$IDEA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$OUT/meta.txt"
+[ -z "${PANEL:-}" ] || printf 'panel: %s\n' "$PANEL" >> "$OUT/meta.txt"
 printf '%s\n' "$OUT"

@@ -1,10 +1,19 @@
 # Changelog
 
-## Unreleased
+## 0.5.0
+
+### Changed (breaking)
+
+- Everything is in English by default: prompts, templates, personas, gate keywords and messages, CLI output, logs, the style tile and the backlog export. The idea and the intake answers can be in any language; the orchestrator replies in the user's language and every artifact is written in English.
+- Renamed to English: phases (`research agenda proposal critique factcheck rebuttal decision sdd audit brand specs tracks backlog`, also for `--from` and `gate`), `panel` command and `--panel`/`--save`/`--mix` options, env vars `PANEL`, `PARALLEL`, `MAX_CALLS`, `MIX`, `ROUTES`, files `debate-rules.md`, `polish.md`, `audit.md`, `panel.conf`, `models.conf`, token keys (`paper surface ink ink-2 line accent on-accent`, block `TOKENS..END`), backlog estimates `S/M/L` and the `Acceptance:` field, EARS `THE SYSTEM SHALL`, audit `Verdict: APPROVED|FIX`, critique `Veto against`/`Quote:`/`Concession`.
+- Model profiles are `free|mixed|strong`. `update` migrates a pre-0.5 `modelos.conf` into `models.conf`, keeping your models.
+- Cases created before this version use the old Portuguese headings and fail the new gates: rerun them with `--from research`.
 
 ### Added
 
-- Model cost profiles on opencode: `open-debate models profile gratis|misto|forte [provider/model]`. `misto` puts the strong model only on the orchestrator, judge, auditor and architecture seats.
+- Panel triggers match English and Portuguese words, and negations in both languages.
+- Case slugs drop accents (`Gestão de clínicas` becomes `gestao-de-clinicas`).
+- Model cost profiles on opencode: `open-debate models profile free|mixed|strong [provider/model]`. `mixed` puts the strong model only on the orchestrator, judge, auditor and architecture seats.
 - `open-debate upgrade [--check]` and a daily new-version notice. CI moves the `stable` tag on every green push to `main`; `install.sh` pins the downloaded commit.
 - Grill intake: rounds of up to 3 questions per theme that challenge vague answers, contradictions and scope, plus a second grill after the agenda for preference-only decisions.
 

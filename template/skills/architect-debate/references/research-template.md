@@ -1,40 +1,40 @@
-# Research - <produto>
+# Research - <product>
 
-Acesso: <AAAA-MM-DD>. Todo achado com URL; sem fonte = `nao verificado`, confianca B.
+Accessed: <YYYY-MM-DD>. Every finding has a URL; no source = `unverified`, confidence L.
 
-## 1. Perguntas (max 6, derivadas do brief)
+## 1. Questions (max 6, derived from the brief)
 
 - Q1 ...
 
-## 2. Achados
+## 2. Findings
 
-| ID | Achado (1 linha, com numero) | Q | Fonte (URL) | Tipo (primaria/secundaria) | Confianca A/M/B |
+| ID | Finding (1 line, with a number) | Q | Source (URL) | Type (primary/secondary) | Confidence H/M/L |
 |----|------|---|-------|------|---|
 | R1 | | | | | |
 
-## 3. Prior art e concorrentes
+## 3. Prior art and competitors
 
-| Produto | Faz bem | Onde falha | Licao para nos | Fonte |
+| Product | Does well | Where it fails | Lesson for us | Source |
 |---|---|---|---|---|
 
-## 4. Numeros que decidem (precos, limites, quotas, benchmarks)
+## 4. Numbers that decide (prices, limits, quotas, benchmarks)
 
-| Item | Valor | Unidade/tier/regiao | Fonte | Data |
+| Item | Value | Unit/tier/region | Source | Date |
 |---|---|---|---|---|
 
-## 5. Postmortems e armadilhas
+## 5. Postmortems and pitfalls
 
-1 linha por armadilha: o que aconteceu, causa, como evitamos, fonte.
+1 line per pitfall: what happened, cause, how we avoid it, source.
 
-## 6. Convencoes da categoria (UX e visual)
+## 6. Category conventions (UX and visual)
 
-O que a maioria faz em layout, navegacao, cor, tipografia, densidade e onboarding. 1 linha cada, com fonte.
+What most products do in layout, navigation, color, typography, density and onboarding. 1 line each, with a source.
 
-## 7. Lacunas
+## 7. Gaps
 
-O que nao foi achado ou verificado, e como resolver (teste, pergunta ao cliente, POC).
+What was not found or verified, and how to resolve it (test, question to the client, POC).
 
-## Fact-check (so em research-check.md)
+## Fact-check (only in research-check.md)
 
-| Claim | Quem (arquivo:linha) | Veredito (confirmado/errado/parcial/nao verificavel) | Valor correto | Fonte |
+| Claim | Who (file:line) | Verdict (confirmed/wrong/partial/unverifiable) | Correct value | Source |
 |---|---|---|---|---|

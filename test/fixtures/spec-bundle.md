@@ -1,28 +1,28 @@
-<!-- arquivo: spec.md -->
+<!-- file: spec.md -->
 # Spec 01 - fixture
 
 ADRs: ADR-0001
 
-## 1. Objetivo
+## 1. Goal
 
-Objetivo da fixture.
+Goal of the fixture.
 
 ## 2. User stories
 
-- US1 [P1] Como analista quero triar para ganhar tempo
+- US1 [P1] As an analyst I want to triage so that I save time
 
-## 3. Requisitos (EARS)
+## 3. Requirements (EARS)
 
-- R1 [US1] QUANDO chega alerta O SISTEMA DEVE enfileirar em 2 s. Criterio: teste de carga.
+- R1 [US1] WHEN an alert arrives THE SYSTEM SHALL queue it within 2 s. Criterion: load test.
 
-<!-- arquivo: plan.md -->
+<!-- file: plan.md -->
 # Plan fixture
 
-## 1. Stack e servicos
+## 1. Stack and services
 
 Cloud Run.
 
-<!-- arquivo: tasks.md -->
+<!-- file: tasks.md -->
 # Tasks fixture
 
-- [ ] T001 [US1] acao
+- [ ] T001 [US1] action

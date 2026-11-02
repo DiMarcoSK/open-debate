@@ -1,15 +1,15 @@
 # Research - Fixture
 
-## 2. Achados
+## 2. Findings
 
-| ID | Achado | Fonte |
+| ID | Finding | Source |
 |----|---|---|
-| R1 | Cloud Run cobra por vCPU-s | https://cloud.google.com/run/pricing |
-| R2 | Cloud SQL tem HA regional | https://cloud.google.com/sql/docs/postgres/high-availability |
-| R3 | Pub/Sub entrega ao menos uma vez | https://cloud.google.com/pubsub/docs/overview |
-| R4 | WCAG 2.2 define contraste | https://www.w3.org/TR/WCAG22/ |
-| R5 | MADR 4.0 define o formato | https://adr.github.io/madr/ |
+| R1 | Cloud Run bills per vCPU-s | https://cloud.google.com/run/pricing |
+| R2 | Cloud SQL has regional HA | https://cloud.google.com/sql/docs/postgres/high-availability |
+| R3 | Pub/Sub delivers at least once | https://cloud.google.com/pubsub/docs/overview |
+| R4 | WCAG 2.2 defines contrast | https://www.w3.org/TR/WCAG22/ |
+| R5 | MADR 4.0 defines the format | https://adr.github.io/madr/ |
 
-## 7. Lacunas
+## 7. Gaps
 
-Volume real de pico ainda nao medido.
+Real peak volume not measured yet.

@@ -1,39 +1,39 @@
-# Brandbook - <nome do produto>
+# Brandbook - <product name>
 
-Fonte: SDD.md (secao 5 e TOKENS), decision.md, proposta e replica de debate-brand, telas de debate-design, revisao de debate-ux.
-TOKENS e copia literal do SDD: o gate compara. Telas e passos sao os do SDD; a marca adapta, nao cria nem corta.
+Source: SDD.md (section 5 and TOKENS), decision.md, debate-brand proposal and rebuttal, debate-design screens, debate-ux review.
+TOKENS is a literal copy of the SDD: the gate compares them. Screens and steps are the SDD's; the brand adapts, it does not add or cut.
 
-## 1. Plataforma de marca
+## 1. Brand platform
 
-Publico, categoria, diferenca, prova. Promessa em 1 frase. 3 valores, cada um com o comportamento que o prova.
+Audience, category, difference, proof. Promise in 1 sentence. 3 values, each with the behavior that proves it.
 
-## 2. Personalidade, voz e tom
+## 2. Personality, voice and tone
 
-3 atributos `<e>, nao <excesso>`. Tom por situacao: sucesso, erro, vazio, venda, com 1 frase real cada. 5 palavras usar, 5 evitar.
+3 attributes `<x>, not <excess>`. Tone per situation: success, error, empty, sales, with 1 real sentence each. 5 words to use, 5 to avoid.
 
 ## 3. Logo
 
-Conceito do simbolo, construcao (grid, geometria), versoes (horizontal, simbolo, monocromatica), area de respiro, tamanho minimo em px, 3 usos proibidos.
+Concept of the mark, construction (grid, geometry), versions (horizontal, symbol, monochrome), clear space, minimum size in px, 3 forbidden uses.
 
-## 4. Cor
+## 4. Color
 
-Bloco TOKENS literal do SDD. Papel de cada cor na marca e proporcao (ex: 60/30/10). Cores de apoio fora da UI, com o contraste de cada uma sobre papel.
+Literal TOKENS block from the SDD. Role of each color in the brand and proportion (ex: 60/30/10). Support colors outside the UI, each with its contrast on paper.
 
-## 5. Tipografia
+## 5. Typography
 
-Display e body do TOKENS, com o motivo. Hierarquia: tabela nivel | tamanho | peso | entrelinha | uso.
+Display and body from TOKENS, with the reason. Hierarchy: table level | size | weight | line height | use.
 
-## 6. Imagem, icones e motion
+## 6. Imagery, icons and motion
 
-Direcao de imagem e ilustracao, set de icones e traco, carater do movimento, 3 nao faca.
+Image and illustration direction, icon set and stroke, motion character, 3 don'ts.
 
-## 7. Telas adaptadas
+## 7. Adapted screens
 
-| Tela | Elemento do design | Regra de marca aplicada | Token |
+| Screen | Design element | Brand rule applied | Token |
 |---|---|---|---|
 
-1+ linha por tela-chave da secao 5 do SDD. Os `ajustar` de debate-ux continuam valendo.
+1+ row per key screen of SDD section 5. The `adjust` lines from debate-ux still hold.
 
-## 8. Aplicacoes e governanca
+## 8. Applications and governance
 
-Favicon e icone de app, email transacional, redes, deck. Checklist de revisao de marca por entrega. Lista banida de visual-contract.md confirmada ausente.
+Favicon and app icon, transactional email, social, deck. Brand review checklist per delivery. Banned list of visual-contract.md confirmed absent.

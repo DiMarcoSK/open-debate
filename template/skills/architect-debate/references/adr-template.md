@@ -1,40 +1,40 @@
-## ADR-NNNN <titulo no imperativo, ex: Usar fila gerenciada para ingestao>
+## ADR-NNNN <title in the imperative, ex: Use a managed queue for ingestion>
 
-- Status: aceito | proposto | rejeitado | substituido por ADR-XXXX
-- Data: <AAAA-MM-DD>
-- Decisores: juiz, painel <agents>
+- Status: accepted | proposed | rejected | superseded by ADR-XXXX
+- Date: <YYYY-MM-DD>
+- Deciders: judge, panel <agents>
 
-### Contexto e problema
+### Context and problem
 
-2 linhas: o driver de qualidade e o numero que forcam a decisao.
+2 lines: the quality driver and the number that force the decision.
 
-### Drivers da decisao
+### Decision drivers
 
-- <driver> (peso <n>)
+- <driver> (weight <n>)
 
-### Opcoes consideradas
+### Considered options
 
 - <A>
 - <B>
 
-### Resultado da decisao
+### Decision outcome
 
-Escolhida: "<A>", porque <placar ponderado A x B e o motivo em 1 linha>.
+Chosen: "<A>", because <weighted score A x B and the reason in 1 line>.
 
-### Consequencias
+### Consequences
 
-- Bom: <ganho>
-- Ruim: <custo aceito>
+- Good: <gain>
+- Bad: <accepted cost>
 
-### Confirmacao
+### Confirmation
 
-Como verificar que a decisao segue valendo: fitness function, teste ou review.
+How to verify the decision still holds: fitness function, test or review.
 
-### Pros e contras das opcoes
+### Pros and cons of the options
 
-- <A>: bom, <...>; ruim, <...>
-- <B>: bom, <...>; ruim, <...>
+- <A>: good, <...>; bad, <...>
+- <B>: good, <...>; bad, <...>
 
-### Dissenso
+### Dissent
 
-<agent>: <ponto mais forte>; reabre se <condicao medivel>. Ou `nenhum`.
+<agent>: <strongest point>; reopens if <measurable condition>. Or `none`.

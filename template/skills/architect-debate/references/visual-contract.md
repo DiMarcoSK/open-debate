@@ -1,69 +1,69 @@
-# Contrato visual - verificado por validate.sh e renderizado por style-tile.sh
+# Visual contract - checked by validate.sh and rendered by style-tile.sh
 
-## 1. Bloco TOKENS (formato exato, 1 chave por linha, comentario so depois de //; exportado como W3C DTCG em tokens.json)
+## 1. TOKENS block (exact format, 1 key per line, comments only after //; exported as W3C DTCG in tokens.json)
 
 ```
 TOKENS
-papel #F2EFE8        // fundo de toda tela
-superficie #FFFFFF   // cartao, tabela, input
-tinta #16181D        // texto principal
-tinta-2 #4A4F5A      // texto secundario
-linha #D9D4C7        // bordas e divisores
-acento #0B5FFF       // so acao primaria e foco
-acento-tinta #FFFFFF // texto sobre acento
+paper #F2EFE8        // background of every screen
+surface #FFFFFF      // card, table, input
+ink #16181D          // primary text
+ink-2 #4A4F5A        // secondary text
+line #D9D4C7         // borders and dividers
+accent #0B5FFF       // primary action and focus only
+on-accent #FFFFFF    // text on accent
 ok #1F6B3A
 warn #9A5B00
 crit #A3231B
 display Instrument Serif
 body Inter
 mono JetBrains Mono
-escala 1.25 base 16
-espaco 4
-raio 6
-movimento 180ms cubic-bezier(.2,.8,.2,1)
-FIM
+scale 1.25 base 16
+space 4
+radius 6
+motion 180ms cubic-bezier(.2,.8,.2,1)
+END
 ```
 
-Os valores acima mostram o formato, nao sao paleta padrao: cada projeto deriva a sua do conceito.
-Hex com 6 digitos. Fontes do Google Fonts. Modo escuro opcional: `papel-escuro`, `tinta-escuro`, `acento-escuro`.
+The values above show the format, they are not a default palette: every project derives its own from the concept.
+6-digit hex. Google Fonts only. Optional dark mode: `paper-dark`, `ink-dark`, `accent-dark`.
 
-## 2. Gates de contraste (WCAG 2.2, validate.sh calcula)
+## 2. Contrast gates (WCAG 2.2, validate.sh computes them)
 
-| Par | Minimo |
+| Pair | Minimum |
 |---|---|
-| tinta / papel | 7.0 |
-| tinta / superficie | 7.0 |
-| tinta-2 / papel | 4.5 |
-| acento-tinta / acento | 4.5 |
-| acento / papel | 3.0 |
-| ok, warn, crit / papel | 4.5 |
-| tinta-escuro / papel-escuro | 7.0 (se existir) |
+| ink / paper | 7.0 |
+| ink / surface | 7.0 |
+| ink-2 / paper | 4.5 |
+| on-accent / accent | 4.5 |
+| accent / paper | 3.0 |
+| ok, warn, crit / paper | 4.5 |
+| ink-dark / paper-dark | 7.0 (if present) |
 
-## 3. Sistema
+## 3. System
 
-Escala de tipo modular (ratio declarado), numerais tabulares em dados, 1 estrategia de elevacao,
-movimento 120-240 ms so para mudanca de estado, com fallback em prefers-reduced-motion.
-Foco visivel 2 px, alvo 24 px (44 px toque), cor nunca e o unico sinal.
+Modular type scale (declared ratio), tabular numerals in data, 1 elevation strategy,
+motion 120-240 ms only for state changes, with a prefers-reduced-motion fallback.
+Visible 2 px focus, 24 px targets (44 px touch), color is never the only signal.
 
-## 4. Copy e estados (texto real com numero)
+## 4. Copy and states (real text with numbers)
 
-- Vazio: o que ha (zero), filtros ativos, proximo passo.
-- Loading: skeleton com N linhas no formato do conteudo, sem spinner solto.
-- Erro: o que houve, por que, o que fazer, entrada do usuario preservada.
-- Sucesso: o que mudou e onde ver.
-- Parcial: quanto chegou (N de M) e o que falta.
+- Empty: what there is (zero), active filters, next step.
+- Loading: skeleton with N rows shaped like the content, no lone spinner.
+- Error: what happened, why, what to do, user input preserved.
+- Success: what changed and where to see it.
+- Partial: how much arrived (N of M) and what is missing.
 
-SDD sem as palavras Vazio, Loading e Erro reprova no gate.
+An SDD without the words Empty, Loading and Error fails the gate.
 
-## 5. Lista banida (veto vinculante, override so com ganho do usuario escrito)
+## 5. Banned list (binding veto, override only with the user gain written)
 
-gradiente roxo-azul, glass cards sobre gradiente, 3 colunas genericas com icones de linha,
-lorem ipsum, sorrisos stock, ilustracao corporate memphis, emoji como icone de interface,
-parede de texto centralizada, carousel de onboarding, dashboard de KPIs sem acao,
-modal para tudo, toast como unico aviso de erro, neon em fundo escuro sem motivo,
-paleta warm paper + terracota reaproveitada sem derivar do conceito.
+purple-blue gradient, glass cards on a gradient, 3 generic columns with line icons,
+lorem ipsum, stock smiles, corporate memphis illustration, emoji as interface icon,
+centered wall of text, onboarding carousel, KPI dashboard with no action,
+modal for everything, toast as the only error notice, neon on dark without a reason,
+warm paper + terracotta palette reused without deriving it from the concept.
 
-## 6. Por spec
+## 6. Per spec
 
-Toda spec com UI declara na secao 6: telas, tokens e componentes usados, estados escritos e criterio de acessibilidade.
-Spec sem UI declara `sem UI` com motivo em 1 linha.
+Every spec with UI declares in section 6: screens, tokens and components used, written states and the accessibility criterion.
+A spec without UI declares `no UI` with the reason in 1 line.

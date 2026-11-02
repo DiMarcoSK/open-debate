@@ -1,19 +1,20 @@
 #!/bin/sh
-# debate.sh <case-dir> [rounds] - protocolo inteiro: pesquisa, agenda, proposta, ataque, fact-check, replica, juiz, ADRs, SDD, auditoria, specs, backlog.
-# Gate reprovado ganha 1 reparo com o motivo (REPAIR=1); reprovou de novo, aborta. Rodar de novo retoma.
-# Cada especialista roda como processo isolado no harness escolhido. Modelos free do opencode recusam chamada headless:
-# neles use /debate dentro do opencode (modo sessao, subagents).
-# Env: HARNESS=opencode, MODEL (vazio = padrao do harness), MODEL_FALLBACK (1x em auth ou limite), RETRIES=2, TIMEOUT=600, MIN_LINES=5,
-#      BACKOFF=20 (s, dobra a cada espera), PARALELO=6 (chamadas simultaneas, 0 = sem teto), MAX_CHAMADAS=0 (teto do run, 0 = sem teto),
-#      FROM=<fase> (arquiva essa fase e as seguintes em raw/arquivo e refaz),
+# debate.sh <case-dir> [rounds] - the whole protocol: research, agenda, proposal, critique, fact-check, rebuttal, judge, ADRs, SDD, audit, specs, backlog.
+# A failed gate gets 1 repair with the reason (REPAIR=1); fails again, aborts. Running again resumes.
+# Each specialist runs as an isolated process on the chosen harness. opencode free models refuse headless calls:
+# with them use /debate inside opencode (session mode, subagents).
+# Every artifact is written in English, whatever the language of the idea and the brief.
+# Env: HARNESS=opencode, MODEL (empty = harness default), MODEL_FALLBACK (1x on auth or limit), RETRIES=2, TIMEOUT=600, MIN_LINES=5,
+#      BACKOFF=20 (s, doubles on every wait), PARALLEL=6 (simultaneous calls, 0 = no cap), MAX_CALLS=0 (run cap, 0 = no cap),
+#      FROM=<phase> (archives that phase and the later ones in raw/archive and redoes them),
 #      FRESH=0, AGENDA=1, REVIEW=1, RESEARCH=1, FACTCHECK=1, SPECS=1, REPAIR=1,
-#      PAINEL="debate-arch debate-ux debate-pm debate-design" (vazio = meta.txt ou escolhido pelo brief; debate-arch, debate-ux e debate-pm sempre entram),
-#      MESA="claude codex" (painel distribuido entre harnesses), ROTAS="debate-arch=claude debate-design=codex:gpt-5" (rota por agent),
-#      HARNESS_CMD (HARNESS=custom: comando que le $PROMPT e $MODEL e imprime a resposta).
+#      PANEL="debate-arch debate-ux debate-pm debate-design" (empty = meta.txt or picked by the brief; debate-arch, debate-ux and debate-pm always join),
+#      MIX="claude codex" (panel spread across harnesses), ROUTES="debate-arch=claude debate-design=codex:gpt-5" (route per agent),
+#      HARNESS_CMD (HARNESS=custom: a command that reads $PROMPT and $MODEL and prints the answer).
 set -eu
 export LC_ALL=C
 
-CASE_DIR="${1:?uso: debate.sh <case-dir> [rounds]}"
+CASE_DIR="${1:?usage: debate.sh <case-dir> [rounds]}"
 ROUNDS="${2:-3}"
 MODEL="${MODEL:-}"
 MODEL_FALLBACK="${MODEL_FALLBACK:-}"
@@ -21,8 +22,8 @@ RETRIES="${RETRIES:-2}"
 TIMEOUT="${TIMEOUT:-600}"
 MIN_LINES="${MIN_LINES:-5}"
 BACKOFF="${BACKOFF:-20}"
-PARALELO="${PARALELO:-6}"
-MAX_CHAMADAS="${MAX_CHAMADAS:-0}"
+PARALLEL="${PARALLEL:-6}"
+MAX_CALLS="${MAX_CALLS:-0}"
 FROM="${FROM:-}"
 FRESH="${FRESH:-0}"
 AGENDA="${AGENDA:-1}"
@@ -32,8 +33,8 @@ FACTCHECK="${FACTCHECK:-1}"
 REPAIR="${REPAIR:-1}"
 SPECS="${SPECS:-1}"
 HARNESS="${HARNESS:-opencode}"
-MESA="${MESA:-}"
-ROTAS="${ROTAS:-}"
+MIX="${MIX:-}"
+ROUTES="${ROUTES:-}"
 
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 REF="$SCRIPT_DIR/../references"
@@ -41,43 +42,44 @@ TOK="$SCRIPT_DIR/tokens.awk"
 . "$SCRIPT_DIR/gates.sh"
 . "$SCRIPT_DIR/harness.sh"
 
-# Painel: o pedido, o gravado no caso ou o que o brief aciona em painel.conf. Os assentos base entram sempre.
-AUTO=0; [ -n "${PAINEL:-}" ] || grep -q '^painel: ' "$CASE_DIR/meta.txt" 2>/dev/null || AUTO=1
-PEDIDO="${PAINEL:-$(painel_do_caso "$CASE_DIR")}"
-PAINEL="$(com_base "$PEDIDO")"
-SOMADOS=""; for b in $PAINEL_BASE; do case " $PEDIDO " in *" $b "*) ;; *) SOMADOS="$SOMADOS $b" ;; esac; done
+# Panel: the one asked for, the one saved in the case or what the brief triggers in panel.conf. The base seats always join.
+AUTO=0; [ -n "${PANEL:-}" ] || grep -q '^panel: ' "$CASE_DIR/meta.txt" 2>/dev/null || AUTO=1
+ASKED="${PANEL:-$(case_panel "$CASE_DIR")}"
+PANEL="$(with_base "$ASKED")"
+ADDED=""; for b in $PANEL_BASE; do case " $ASKED " in *" $b "*) ;; *) ADDED="$ADDED $b" ;; esac; done
 
 case "$ROUNDS" in ''|*[!0-9]*) ROUNDS=3;; esac
 [ "$ROUNDS" -gt 3 ] && ROUNDS=3
 [ "$ROUNDS" -lt 1 ] && ROUNDS=1
 
-command -v jq >/dev/null 2>&1 || { echo "erro: jq nao encontrado no PATH" >&2; exit 2; }
-command -v perl >/dev/null 2>&1 || { echo "erro: perl nao encontrado no PATH (usado no timeout)" >&2; exit 2; }
-[ -f "$CASE_DIR/constitution.md" ] || { echo "erro: $CASE_DIR/constitution.md ausente, rode new-debate.sh" >&2; exit 2; }
-"$SCRIPT_DIR/validate.sh" "$CASE_DIR" --brief >&2 || { echo "erro: brief reprovado, preencha $CASE_DIR/brief.md" >&2; exit 2; }
-n=0; for a in $PAINEL; do
+command -v jq >/dev/null 2>&1 || { echo "error: jq not found on PATH" >&2; exit 2; }
+command -v perl >/dev/null 2>&1 || { echo "error: perl not found on PATH (used for the timeout)" >&2; exit 2; }
+[ -f "$CASE_DIR/constitution.md" ] || { echo "error: $CASE_DIR/constitution.md missing, run new-debate.sh" >&2; exit 2; }
+"$SCRIPT_DIR/validate.sh" "$CASE_DIR" --brief >&2 || { echo "error: brief failed, fill $CASE_DIR/brief.md" >&2; exit 2; }
+n=0; for a in $PANEL; do
   n=$((n + 1))
-  [ -f "$SCRIPT_DIR/../personas/$a.md" ] || { echo "erro: persona inexistente no painel: $a" >&2; exit 2; }
+  [ -f "$SCRIPT_DIR/../personas/$a.md" ] || { echo "error: unknown persona on the panel: $a" >&2; exit 2; }
 done
-[ "$n" -ge 2 ] || { echo "erro: PAINEL precisa de 2+ agents" >&2; exit 2; }
-case "$FROM" in ''|pesquisa|agenda|proposta|ataque|factcheck|replica|decisao|sdd|marca|specs|backlog) ;;
-  *) echo "erro: --from invalido: $FROM (pesquisa agenda proposta ataque factcheck replica decisao sdd marca specs backlog)" >&2; exit 2 ;;
-esac
+[ "$n" -ge 2 ] || { echo "error: PANEL needs 2+ agents" >&2; exit 2; }
+PHASES="research agenda proposal critique factcheck rebuttal decision sdd brand specs backlog"
+if [ -n "$FROM" ]; then
+  case " $PHASES " in *" $FROM "*) ;; *) echo "error: invalid --from: $FROM ($PHASES)" >&2; exit 2 ;; esac
+fi
 
-# Mesa: 1 harness por vez ao redor do painel. ROTAS explicitas vencem.
-if [ -n "$MESA" ]; then
-  set -- $MESA; i=0; n_m="$#"; distrib=""
-  for a in $PAINEL; do
+# Mix: 1 harness at a time around the panel. Explicit ROUTES win.
+if [ -n "$MIX" ]; then
+  set -- $MIX; i=0; n_m="$#"; distrib=""
+  for a in $PANEL; do
     i=$((i + 1)); j=$(( (i - 1) % n_m + 1 )); eval "h=\${$j}"
     distrib="$distrib $a=$h"
   done
-  ROTAS="${distrib# } $ROTAS"
+  ROUTES="${distrib# } $ROUTES"
 fi
 
-# rota <agent>: imprime "<harness> <modelo>"; modelo pode vir vazio.
-rota() {
+# route <agent>: prints "<harness> <model>"; the model may be empty.
+route() {
   r=""
-  for x in $ROTAS; do case "$x" in "$1="*) r="${x#*=}" ;; esac; done
+  for x in $ROUTES; do case "$x" in "$1="*) r="${x#*=}" ;; esac; done
   [ -n "$r" ] || { printf '%s %s' "$HARNESS" "$MODEL"; return; }
   case "$r" in
     *:*) printf '%s %s' "${r%%:*}" "${r#*:}" ;;
@@ -85,166 +87,166 @@ rota() {
   esac
 }
 
-h_existe "$HARNESS"
-for x in $ROTAS; do r="${x#*=}"; h_existe "${r%%:*}"; done
+h_exists "$HARNESS"
+for x in $ROUTES; do r="${x#*=}"; h_exists "${r%%:*}"; done
 
-# macOS nao tem timeout(1); perl alarm mata a chamada que trava em retry infinito do provider.
+# macOS has no timeout(1); perl alarm kills a call stuck in an endless provider retry.
 TO="perl -e alarm(shift);exec(@ARGV)||die $TIMEOUT"
 
 OUT="$(CDPATH= cd -- "$CASE_DIR" && pwd)"
 mkdir -p "$OUT/raw"
 
-# Lock: 2 runs no mesmo caso sobrescrevem saidas um do outro. Trava de run morto e reaproveitada.
+# Lock: 2 runs on the same case overwrite each other's outputs. A dead run's lock is taken over.
 LOCK="$OUT/raw/.lock"
 if ! mkdir "$LOCK" 2>/dev/null; then
-  dono="$(cat "$LOCK/pid" 2>/dev/null || true)"
-  if [ -n "$dono" ] && kill -0 "$dono" 2>/dev/null; then echo "erro: caso em execucao pelo processo $dono" >&2; exit 2; fi
+  owner="$(cat "$LOCK/pid" 2>/dev/null || true)"
+  if [ -n "$owner" ] && kill -0 "$owner" 2>/dev/null; then echo "error: case already running in process $owner" >&2; exit 2; fi
   rm -rf "$LOCK"; mkdir "$LOCK"
 fi
 printf '%s\n' "$$" > "$LOCK/pid"
 
 PIDFILE="$OUT/raw/pids.$$"
-FALHAS="$OUT/raw/falhas.$$"
-CHAMADAS="$OUT/raw/chamadas.$$"
-METRICAS="$OUT/raw/metricas.tsv"
+FAILS="$OUT/raw/fails.$$"
+CALLS="$OUT/raw/calls.$$"
+METRICS="$OUT/raw/metrics.tsv"
 SUMMARY="$OUT/raw/summary.log"
-INICIO="$(date +%s)"
-: > "$PIDFILE"; : > "$FALHAS"; : > "$CHAMADAS"
+START="$(date +%s)"
+: > "$PIDFILE"; : > "$FAILS"; : > "$CALLS"
 
-# Mata a arvore toda: sem job control, chamada em background ignora SIGINT e seguiria gastando apos o Ctrl-C.
-mata_arvore() {
-  for filho in $(pgrep -P "$1" 2>/dev/null || true); do mata_arvore "$filho"; done
+# Kill the whole tree: without job control, a background call ignores SIGINT and would keep spending after Ctrl-C.
+kill_tree() {
+  for child in $(pgrep -P "$1" 2>/dev/null || true); do kill_tree "$child"; done
   kill "$1" 2>/dev/null || true
 }
-interrompe() {
+interrupt() {
   trap - INT TERM
-  [ -z "$FG" ] || mata_arvore "$FG"
-  while read -r vp vd; do [ -z "$vp" ] || mata_arvore "$vp"; done < "$PIDFILE"
-  printf 'INTERROMPIDO: rodar de novo retoma\n' | tee -a "$SUMMARY"
+  [ -z "$FG" ] || kill_tree "$FG"
+  while read -r vp vd; do [ -z "$vp" ] || kill_tree "$vp"; done < "$PIDFILE"
+  printf 'INTERRUPTED: running again resumes\n' | tee -a "$SUMMARY"
   exit 130
 }
-FG=""; MINIMO=""
-sai() { rm -rf "$LOCK" "$OUT/raw/salas"; rm -f "$PIDFILE" "$FALHAS" "$CHAMADAS"; }
-trap sai EXIT
-trap interrompe INT TERM
+FG=""; MINIMUM=""
+cleanup() { rm -rf "$LOCK" "$OUT/raw/rooms"; rm -f "$PIDFILE" "$FAILS" "$CALLS"; }
+trap cleanup EXIT
+trap interrupt INT TERM
 
-# arquiva_desde <fase>: move a fase e as seguintes para raw/arquivo/<data>. Nada se apaga, spec editada fica la.
-arquiva_desde() {
-  a_dest="$OUT/raw/arquivo/$(date -u +%Y%m%dT%H%M%SZ)"; a_on=0
-  for g in pesquisa agenda proposta ataque factcheck replica decisao sdd marca specs backlog; do
+# archive_from <phase>: moves that phase and the later ones to raw/archive/<date>. Nothing is deleted, an edited spec stays there.
+archive_from() {
+  a_dest="$OUT/raw/archive/$(date -u +%Y%m%dT%H%M%SZ)"; a_on=0
+  for g in $PHASES; do
     [ "$g" = "$1" ] && a_on=1
     [ "$a_on" = "1" ] || continue
     case "$g" in
-      pesquisa) l="research.md" ;;
+      research) l="research.md" ;;
       agenda) l="agenda.md" ;;
-      proposta) l="proposals" ;;
-      ataque) l="critiques" ;;
+      proposal) l="proposals" ;;
+      critique) l="critiques" ;;
       factcheck) l="research-check.md" ;;
-      replica) l="$(cd "$OUT" && ls proposals/*-r2.md 2>/dev/null || true)" ;;
-      decisao) l="decision.md adr" ;;
-      sdd) l="SDD.md auditoria.md style-tile.html tokens.json tokens.css" ;;
-      marca) l="BRANDBOOK.md" ;;
+      rebuttal) l="$(cd "$OUT" && ls proposals/*-r2.md 2>/dev/null || true)" ;;
+      decision) l="decision.md adr" ;;
+      sdd) l="SDD.md audit.md style-tile.html tokens.json tokens.css" ;;
+      brand) l="BRANDBOOK.md" ;;
       specs) l="specs checklists" ;;
       backlog) l="backlog BACKLOG.md backlog.csv backlog.json backlog-gh.sh" ;;
     esac
     for x in $l; do
       [ -e "$OUT/$x" ] || continue
-      mkdir -p "$a_dest/$(pai "$x")"; mv "$OUT/$x" "$a_dest/$x"
+      mkdir -p "$a_dest/$(parent "$x")"; mv "$OUT/$x" "$a_dest/$x"
     done
   done
-  printf 'arquivado em %s, refazendo desde %s\n' "${a_dest#"$OUT"/}" "$1" | tee -a "$SUMMARY"
+  printf 'archived in %s, redoing from %s\n' "${a_dest#"$OUT"/}" "$1" | tee -a "$SUMMARY"
 }
-[ -z "$FROM" ] || arquiva_desde "$FROM"
+[ -z "$FROM" ] || archive_from "$FROM"
 
 mkdir -p "$OUT/proposals" "$OUT/critiques" "$OUT/adr"
-for t in regras-debate.md visual-contract.md research-template.md agenda-template.md adr-template.md backlog-template.md lapidacao.md sdd-template.md spec-template.md plan-template.md tasks-template.md auditoria-template.md brandbook-template.md; do
+for t in debate-rules.md visual-contract.md research-template.md agenda-template.md adr-template.md backlog-template.md polish.md sdd-template.md spec-template.md plan-template.md tasks-template.md audit-template.md brandbook-template.md; do
   [ -f "$OUT/$t" ] || cp "$REF/$t" "$OUT/$t"
 done
-{ grep -v '^painel:\|^harness:\|^rounds:' "$OUT/meta.txt" 2>/dev/null || true; printf 'painel: %s\nharness: %s\nrounds: %s\n' "$PAINEL" "$HARNESS" "$ROUNDS"; } > "$OUT/meta.txt.tmp"
+{ grep -v '^panel:\|^harness:\|^rounds:' "$OUT/meta.txt" 2>/dev/null || true; printf 'panel: %s\nharness: %s\nrounds: %s\n' "$PANEL" "$HARNESS" "$ROUNDS"; } > "$OUT/meta.txt.tmp"
 mv "$OUT/meta.txt.tmp" "$OUT/meta.txt"
 
-printf '\n== %s rounds=%s harness=%s rotas=%s painel=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$ROUNDS" "$HARNESS" "$ROTAS" "$PAINEL" >> "$SUMMARY"
+printf '\n== %s rounds=%s harness=%s routes=%s panel=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$ROUNDS" "$HARNESS" "$ROUTES" "$PANEL" >> "$SUMMARY"
 
 log() { printf '%s\n' "$*" | tee -a "$SUMMARY"; }
-abort() { log "ABORTA: $*"; exit 1; }
+abort() { log "ABORT: $*"; exit 1; }
 
-defasados "$OUT" | while IFS= read -r d; do log "aviso: $d; use --from para refazer o que depende dele"; done
-[ -z "$SOMADOS" ] || log "painel: assento base somado:$SOMADOS"
+stale "$OUT" | while IFS= read -r d; do log "warning: $d; use --from to redo what depends on it"; done
+[ -z "$ADDED" ] || log "panel: base seat added:$ADDED"
 if [ "$AUTO" = "1" ]; then
-  motivos_painel "$OUT" | while IFS= read -r x; do
-    if no_painel "${x%%:*}"; then log "painel: ${x%%:*} pelo brief (${x#*: })"; fi
+  panel_reasons "$OUT" | while IFS= read -r x; do
+    if on_panel "${x%%:*}"; then log "panel: ${x%%:*} from the brief (${x#*: })"; fi
   done
 fi
-dados="$(sed -n 's/^- Dados sensiveis[^:]*:[[:space:]]*//p' "$OUT/brief.md" | tr '[:upper:]' '[:lower:]')"
-if ! printf '%s' " $PAINEL " | grep -q ' debate-sec ' && printf '%s' "$dados" | grep -Eq 'lgpd|gdpr|pci|hipaa|saude|pessoa|cpf|financ' && ! printf '%s' "$dados" | grep -Eq '^(nao|nenhum|sem) '; then
-  log "aviso: brief com dado regulado e painel sem debate-sec; considere --painel arch,design,sec"
+data="$(sed -n 's/^- Sensitive data[^:]*:[[:space:]]*//p' "$OUT/brief.md" | tr '[:upper:]' '[:lower:]')"
+if ! on_panel debate-sec && printf '%s' "$data" | grep -Eq 'lgpd|gdpr|ccpa|pci|hipaa|health|saude|personal|pessoa|pii|cpf|ssn|financ' && ! printf '%s' "$data" | grep -Eq '^(no|none|not|without|nao|nenhum|sem) '; then
+  log "warning: brief with regulated data and no debate-sec on the panel; consider --panel arch,design,sec"
 fi
 
-# Aqui o arquivo sai do texto devolvido. Sem esta linha, o agent tenta gravar, leva permissao negada e responde com um pedido de permissao.
-SAIDA='SAIDA: nesta execucao voce nao grava arquivo: nao use Write nem Edit. Tua resposta final inteira e o conteudo do arquivo pedido, sem comentario antes ou depois e sem cerca de codigo em volta.'
+# The file comes from the returned text. Without this line, the agent tries to write, gets a permission denial and replies with a permission request.
+OUTPUT='OUTPUT: in this run you do not write files: do not use Write or Edit. Your whole final answer is the content of the requested file, with no comment before or after and no code fence around it. Write it in English, whatever the language of the brief.'
 
 run_once() {
   agent="$1"; task="$2"; dest="$3"; raw="$4"; rot="$5"
   h="${rot%% *}"; m="${rot#* }"
-  rc=0; h_run "$h" "$agent" "$task. $SAIDA" "$m" "${SALA:-$OUT}" "$raw.tmp" || rc=$?
-  if [ "$rc" -eq 142 ]; then log "tempo esgotado em $agent apos ${TIMEOUT}s: aumente TIMEOUT e rode de novo"; fi
+  rc=0; h_run "$h" "$agent" "$task. $OUTPUT" "$m" "${ROOM:-$OUT}" "$raw.tmp" || rc=$?
+  if [ "$rc" -eq 142 ]; then log "timed out in $agent after ${TIMEOUT}s: raise TIMEOUT and run again"; fi
   [ "$rc" -eq 0 ] || return 1
-  h_texto "$h" "$raw.tmp" "$dest.new" || return 1
-  [ "$(wc -l < "$dest.new" | tr -d ' ')" -ge "${MINIMO:-$MIN_LINES}" ] || return 1
+  h_text "$h" "$raw.tmp" "$dest.new" || return 1
+  [ "$(wc -l < "$dest.new" | tr -d ' ')" -ge "${MINIMUM:-$MIN_LINES}" ] || return 1
   mv "$dest.new" "$dest"
   mv "$raw.tmp" "$raw"
 }
 
-cabe_chamada() {
-  printf 'x\n' >> "$CHAMADAS"
-  [ "$MAX_CHAMADAS" -gt 0 ] || return 0
-  [ "$(wc -l < "$CHAMADAS" | tr -d ' ')" -le "$MAX_CHAMADAS" ] && return 0
-  log "teto de MAX_CHAMADAS=$MAX_CHAMADAS atingido em $agent"; return 1
+call_fits() {
+  printf 'x\n' >> "$CALLS"
+  [ "$MAX_CALLS" -gt 0 ] || return 0
+  [ "$(wc -l < "$CALLS" | tr -d ' ')" -le "$MAX_CALLS" ] && return 0
+  log "MAX_CALLS=$MAX_CALLS cap reached at $agent"; return 1
 }
 
-tenta_agent() {
+try_agent() {
   agent="$1"; task="$2"; dest="$3"; raw="$4"
-  rot="$(rota "$agent")"
-  tentativas=1
-  while [ "$tentativas" -le "$RETRIES" ]; do
-    cabe_chamada || return 1
+  rot="$(route "$agent")"
+  tries=1
+  while [ "$tries" -le "$RETRIES" ]; do
+    call_fits || return 1
     run_once "$agent" "$task" "$dest" "$raw" "$rot" && return 0
-    if h_auth_falhou "$raw.tmp"; then
+    if h_auth_failed "$raw.tmp"; then
       if [ -z "$MODEL_FALLBACK" ]; then
-        log "auth ou cota em $agent (${rot%% *}): confira o login; no opencode, modelos free so rodam na sessao (/debate)"
+        log "auth or quota error in $agent (${rot%% *}): check the login; in opencode, free models only run in session (/debate)"
         break
       fi
-      log "auth ou cota no modelo primario, fallback 1x para $dest"
-      cabe_chamada || return 1
+      log "auth or quota error on the primary model, falling back 1x for $dest"
+      call_fits || return 1
       run_once "$agent" "$task" "$dest" "$raw" "${rot%% *} $MODEL_FALLBACK" && return 0
       break
     fi
-    # Espera so o que uma espera resolve; o jitter separa chamadas da mesma leva, que batem no limite juntas.
-    if [ "$tentativas" -lt "$RETRIES" ] && h_limite_falhou "$raw.tmp"; then
-      e=$((BACKOFF * (1 << (tentativas - 1)) + ($(date +%s) + ${#dest}) % (BACKOFF / 4 + 1)))
-      log "limite em $agent (${rot%% *}), nova tentativa em ${e}s"
+    # Wait only on what waiting fixes; the jitter spreads calls of the same wave, which hit the limit together.
+    if [ "$tries" -lt "$RETRIES" ] && h_limit_failed "$raw.tmp"; then
+      e=$((BACKOFF * (1 << (tries - 1)) + ($(date +%s) + ${#dest}) % (BACKOFF / 4 + 1)))
+      log "rate limit in $agent (${rot%% *}), retrying in ${e}s"
       sleep "$e"
     fi
-    tentativas=$((tentativas + 1))
+    tries=$((tries + 1))
   done
   rm -f "$dest.new"
-  log "FALHOU $dest apos $RETRIES tentativa(s), ver $raw.tmp.stderr"
+  log "FAILED $dest after $RETRIES attempt(s), see $raw.tmp.stderr"
   return 1
 }
 
-# agente <agent> <tarefa> <destino> <bruto>: 1 linha em raw/metricas.tsv por chamada logica.
-agente() {
-  t0="$(date +%s)"; rc2=0; tentativas=0
-  tenta_agent "$@" || rc2=$?
-  b4="${4##*/}"; r4="$(rota "$1")"
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "${b4%.json}" "$1" "$(($(date +%s) - t0))" "$tentativas" "$rc2" "${r4%% *}" >> "$METRICAS"
+# agent_call <agent> <task> <dest> <raw>: 1 line in raw/metrics.tsv per logical call.
+agent_call() {
+  t0="$(date +%s)"; rc2=0; tries=0
+  try_agent "$@" || rc2=$?
+  b4="${4##*/}"; r4="$(route "$1")"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "${b4%.json}" "$1" "$(($(date +%s) - t0))" "$tries" "$rc2" "${r4%% *}" >> "$METRICS"
   return "$rc2"
 }
 
-# Chamada de 1 agent so. Roda em background porque o shell so atende sinal fora de comando em primeiro plano:
-# com `wait`, interromper nao precisa esperar a chamada acabar.
+# A single-agent call. It runs in the background because the shell only handles signals outside a foreground command:
+# with `wait`, an interrupt does not have to wait for the call to finish.
 run_agent() {
-  agente "$@" &
+  agent_call "$@" &
   FG="$!"; rcf=0
   wait "$FG" || rcf=$?
   FG=""
@@ -253,244 +255,244 @@ run_agent() {
 
 need() { [ "$FRESH" = "1" ] || [ ! -s "$1" ]; }
 
-# vaga: segura a leva em PARALELO chamadas simultaneas, esperando a mais antiga terminar.
-vaga() {
-  [ "$PARALELO" -gt 0 ] || return 0
-  while [ "$(wc -l < "$PIDFILE" | tr -d ' ')" -ge "$PARALELO" ]; do
+# slot: holds the wave at PARALLEL simultaneous calls, waiting for the oldest to finish.
+slot() {
+  [ "$PARALLEL" -gt 0 ] || return 0
+  while [ "$(wc -l < "$PIDFILE" | tr -d ' ')" -ge "$PARALLEL" ]; do
     read -r vp vd < "$PIDFILE"
-    if wait "$vp"; then log "ok $vd"; else printf 'x\n' >> "$FALHAS"; fi
+    if wait "$vp"; then log "ok $vd"; else printf 'x\n' >> "$FAILS"; fi
     sed 1d "$PIDFILE" > "$PIDFILE.n"; mv "$PIDFILE.n" "$PIDFILE"
   done
 }
 
 launch() {
-  if [ "${5:-}" = "forca" ] || need "$3"; then
-    vaga
-    agente "$1" "$2" "$3" "$4" &
+  if [ "${5:-}" = "force" ] || need "$3"; then
+    slot
+    agent_call "$1" "$2" "$3" "$4" &
     printf '%s %s\n' "$!" "$3" >> "$PIDFILE"
   else
-    log "reuso $3"
+    log "reuse $3"
   fi
 }
 
 wait_all() {
-  failed="$(wc -l < "$FALHAS" | tr -d ' ')"; : > "$FALHAS"
+  failed="$(wc -l < "$FAILS" | tr -d ' ')"; : > "$FAILS"
   while read -r pid dest; do
     [ -z "$pid" ] && continue
     if wait "$pid"; then log "ok $dest"; else failed=$((failed + 1)); fi
   done < "$PIDFILE"
   : > "$PIDFILE"
-  [ "$failed" -eq 0 ] || { log "$1: $failed saida(s) falharam"; return 1; }
+  [ "$failed" -eq 0 ] || { log "$1: $failed output(s) failed"; return 1; }
 }
 
 short() { printf '%s' "${1#debate-}"; }
 
-rivais() {
+rivals() {
   s=""
-  for r in $PAINEL; do [ "$r" = "$1" ] || s="$s proposals/$r.md"; done
+  for r in $PANEL; do [ "$r" = "$1" ] || s="$s proposals/$r.md"; done
   printf '%s' "${s# }"
 }
 
-# sala <fase> <agent> [extra]: diretorio com so o que o agent pode ler. Fora dele nao ha proposta nem critica de rival:
-# paralelo nao vaza e o reparo de um nao le o outro. Replica e seguintes leem tudo, sem sala.
-sala() {
+# room <phase> <agent> [extra]: a directory with only what the agent may read. It holds no rival proposal or critique:
+# parallel calls do not leak and one agent's repair does not read another's. Rebuttal and later phases read everything, no room.
+room() {
   case "$1" in
-    proposta) l="visual-contract.md" ;;
-    ataque) l="$(rivais "$2")" ;;
+    proposal) l="visual-contract.md" ;;
+    critique) l="$(rivals "$2")" ;;
     *) return 0 ;;
   esac
-  sd="$OUT/raw/salas/$1-$(short "$2")"; rm -rf "$sd"; mkdir -p "$sd"
-  for x in brief.md constitution.md research.md agenda.md regras-debate.md $l ${3:-}; do
+  sd="$OUT/raw/rooms/$1-$(short "$2")"; rm -rf "$sd"; mkdir -p "$sd"
+  for x in brief.md constitution.md research.md agenda.md debate-rules.md $l ${3:-}; do
     [ -e "$OUT/$x" ] || continue
-    mkdir -p "$sd/$(pai "$x")"; cp "$OUT/$x" "$sd/$x"
+    mkdir -p "$sd/$(parent "$x")"; cp "$OUT/$x" "$sd/$x"
   done
   printf '%s' "$sd"
 }
 
 dest_for() {
   case "$1" in
-    proposta) printf '%s' "$OUT/proposals/$2.md" ;;
-    ataque) printf '%s' "$OUT/critiques/$2.md" ;;
-    replica) printf '%s' "$OUT/proposals/$2-r2.md" ;;
+    proposal) printf '%s' "$OUT/proposals/$2.md" ;;
+    critique) printf '%s' "$OUT/critiques/$2.md" ;;
+    rebuttal) printf '%s' "$OUT/proposals/$2-r2.md" ;;
   esac
 }
 
 task_for() {
   case "$1" in
-    proposta)
+    proposal)
       extra=""; case "$2" in debate-design|debate-ux|debate-brand) extra=", visual-contract.md" ;; esac
-      printf 'fase proposta: le brief.md, constitution.md, research.md, agenda.md, regras-debate.md%s; responde so no formato de proposta do teu papel, com a secao Posicoes cobrindo cada Dn de agenda.md' "$extra" ;;
-    ataque)
-      printf 'fase ataque: le brief.md, research.md, agenda.md, regras-debate.md e as propostas rivais %s; responde so no formato de ataque de regras-debate.md, copiando a citacao literal do arquivo, com arquivo:linha' "$(rivais "$2")" ;;
-    replica)
-      printf 'fase replica: le brief.md, research.md, research-check.md, regras-debate.md, proposals/%s.md, os vetos contra %s em critiques/ e as propostas rivais %s; responde so no formato de replica de regras-debate.md' "$2" "$2" "$(rivais "$2")" ;;
+      printf 'phase proposal: read brief.md, constitution.md, research.md, agenda.md, debate-rules.md%s; reply only in your role'"'"'s proposal format, with the Positions section covering every Dn of agenda.md' "$extra" ;;
+    critique)
+      printf 'phase critique: read brief.md, research.md, agenda.md, debate-rules.md and the rival proposals %s; reply only in the critique format of debate-rules.md, copying the quote literally from the file, with file:line' "$(rivals "$2")" ;;
+    rebuttal)
+      printf 'phase rebuttal: read brief.md, research.md, research-check.md, debate-rules.md, proposals/%s.md, the vetoes against %s in critiques/ and the rival proposals %s; reply only in the rebuttal format of debate-rules.md' "$2" "$2" "$(rivals "$2")" ;;
   esac
 }
 
-reparo() { printf '%s. CORRECAO: tua saida anterior em %s reprovou no gate: %s. Reemite a saida completa corrigida.' "$1" "${2#"$OUT"/}" "$3"; }
+repair() { printf '%s. FIX: your previous output in %s failed the gate: %s. Re-emit the full corrected output.' "$1" "${2#"$OUT"/}" "$3"; }
 
-fase_painel() {
-  fase="$1"; tag="$2"; quem="${3:-$PAINEL}"
-  for a in $quem; do
-    SALA="$(sala "$fase" "$a")"
-    launch "$a" "$(task_for "$fase" "$a")" "$(dest_for "$fase" "$a")" "$OUT/raw/$tag-$(short "$a").json"
+panel_phase() {
+  phase="$1"; tag="$2"; who="${3:-$PANEL}"
+  for a in $who; do
+    ROOM="$(room "$phase" "$a")"
+    launch "$a" "$(task_for "$phase" "$a")" "$(dest_for "$phase" "$a")" "$OUT/raw/$tag-$(short "$a").json"
   done
-  SALA=""
-  wait_all "$fase"
+  ROOM=""
+  wait_all "$phase"
 }
 
-gate_painel() {
-  fase="$1"; tag="$2"; ruins=""
-  for a in $PAINEL; do
-    d="$(dest_for "$fase" "$a")"; r="$(check "$fase" "$a" "$d")"
+panel_gate() {
+  phase="$1"; tag="$2"; bad=""
+  for a in $PANEL; do
+    d="$(dest_for "$phase" "$a")"; r="$(check "$phase" "$a" "$d")"
     [ -z "$r" ] && continue
-    log "gate $fase reprovado em ${d#"$OUT"/}: $r"
+    log "gate $phase failed on ${d#"$OUT"/}: $r"
     [ "$REPAIR" = "1" ] || return 1
-    ruins="$ruins $a"
-    SALA="$(sala "$fase" "$a" "${d#"$OUT"/}")"
-    launch "$a" "$(reparo "$(task_for "$fase" "$a")" "$d" "$r")" "$d" "$OUT/raw/$tag-$(short "$a")-reparo.json" forca
+    bad="$bad $a"
+    ROOM="$(room "$phase" "$a" "${d#"$OUT"/}")"
+    launch "$a" "$(repair "$(task_for "$phase" "$a")" "$d" "$r")" "$d" "$OUT/raw/$tag-$(short "$a")-repair.json" force
   done
-  SALA=""
-  [ -z "$ruins" ] && { log "gate $fase ok"; return 0; }
-  wait_all "$fase reparo" || true
+  ROOM=""
+  [ -z "$bad" ] && { log "gate $phase ok"; return 0; }
+  wait_all "$phase repair" || true
   ok=0
-  for a in $ruins; do
-    d="$(dest_for "$fase" "$a")"; r="$(check "$fase" "$a" "$d")"
-    [ -z "$r" ] || { log "gate $fase reprovado apos reparo em ${d#"$OUT"/}: $r"; ok=1; }
+  for a in $bad; do
+    d="$(dest_for "$phase" "$a")"; r="$(check "$phase" "$a" "$d")"
+    [ -z "$r" ] || { log "gate $phase failed after repair on ${d#"$OUT"/}: $r"; ok=1; }
   done
-  [ "$ok" -eq 0 ] && log "gate $fase ok apos reparo"
+  [ "$ok" -eq 0 ] && log "gate $phase ok after repair"
   return "$ok"
 }
 
 gate_one() {
-  fase="$1"; agent="$2"; dest="$3"; task="$4"; raw="$5"
-  r="$(check "$fase" "$agent" "$dest")"
-  [ -z "$r" ] && { log "gate $fase ok"; return 0; }
-  log "gate $fase reprovado: $r"
+  phase="$1"; agent="$2"; dest="$3"; task="$4"; raw="$5"
+  r="$(check "$phase" "$agent" "$dest")"
+  [ -z "$r" ] && { log "gate $phase ok"; return 0; }
+  log "gate $phase failed: $r"
   [ "$REPAIR" = "1" ] || return 1
-  run_agent "$agent" "$(reparo "$task" "$dest" "$r")" "$dest" "$raw.reparo" || return 1
-  r="$(check "$fase" "$agent" "$dest")"
-  [ -z "$r" ] && { log "gate $fase ok apos reparo"; return 0; }
-  log "gate $fase reprovado apos reparo: $r"; return 1
+  run_agent "$agent" "$(repair "$task" "$dest" "$r")" "$dest" "$raw.repair" || return 1
+  r="$(check "$phase" "$agent" "$dest")"
+  [ -z "$r" ] && { log "gate $phase ok after repair"; return 0; }
+  log "gate $phase failed after repair: $r"; return 1
 }
 
-# fase 1 - pesquisa
+# phase 1 - research
 if [ "$RESEARCH" = "1" ]; then
-  T="modo pesquisa: le brief.md e research-template.md; pesquisa na web e responde so com o research.md completo no template"
-  if need "$OUT/research.md" || grep -q '^pulado' "$OUT/research.md"; then
-    run_agent debate-research "$T" "$OUT/research.md" "$OUT/raw/f1-research.json" || abort "pesquisa falhou (RESEARCH=0 pula)"
-  else log "reuso $OUT/research.md"; fi
-  gate_one pesquisa debate-research "$OUT/research.md" "$T" "$OUT/raw/f1-research.json" || abort "gate pesquisa"
+  T="phase research: read brief.md and research-template.md; research the web and reply only with the full research.md in the template"
+  if need "$OUT/research.md" || grep -q '^skipped' "$OUT/research.md"; then
+    run_agent debate-research "$T" "$OUT/research.md" "$OUT/raw/f1-research.json" || abort "research failed (RESEARCH=0 skips it)"
+  else log "reuse $OUT/research.md"; fi
+  gate_one research debate-research "$OUT/research.md" "$T" "$OUT/raw/f1-research.json" || abort "research gate"
 else
-  [ -s "$OUT/research.md" ] || printf '# Research\n\npulado: RESEARCH=0, numero sem fonte vale como estimativa\n' > "$OUT/research.md"
+  [ -s "$OUT/research.md" ] || printf '# Research\n\nskipped: RESEARCH=0, a number without a source counts as an estimate\n' > "$OUT/research.md"
 fi
 
-# fase 1b - agenda: as decisoes em disputa, antes de qualquer proposta. Caso antigo com propostas prontas segue sem.
+# phase 1b - agenda: the contested decisions, before any proposal. An older case with proposals already done goes without it.
 if [ "$AGENDA" != "1" ]; then
-  [ -s "$OUT/agenda.md" ] || printf '# Agenda\n\npulado: AGENDA=0\n' > "$OUT/agenda.md"
-elif [ "$FRESH" != "1" ] && [ ! -s "$OUT/agenda.md" ] && [ -s "$OUT/proposals/$(set -- $PAINEL; printf '%s' "$1").md" ]; then
-  printf '# Agenda\n\npulado: caso anterior a agenda\n' > "$OUT/agenda.md"
+  [ -s "$OUT/agenda.md" ] || printf '# Agenda\n\nskipped: AGENDA=0\n' > "$OUT/agenda.md"
+elif [ "$FRESH" != "1" ] && [ ! -s "$OUT/agenda.md" ] && [ -s "$OUT/proposals/$(set -- $PANEL; printf '%s' "$1").md" ]; then
+  printf '# Agenda\n\nskipped: case older than the agenda\n' > "$OUT/agenda.md"
 else
-  T="fase agenda: le brief.md, constitution.md, research.md, agenda-template.md e regras-debate.md; painel: $PAINEL; responde so com o agenda.md"
+  T="phase agenda: read brief.md, constitution.md, research.md, agenda-template.md and debate-rules.md; panel: $PANEL; reply only with agenda.md"
   if need "$OUT/agenda.md"; then
-    run_agent debate-judge "$T" "$OUT/agenda.md" "$OUT/raw/f1b-agenda.json" || abort "agenda falhou (AGENDA=0 pula)"
-  else log "reuso $OUT/agenda.md"; fi
-  gate_one agenda debate-judge "$OUT/agenda.md" "$T" "$OUT/raw/f1b-agenda.json" || abort "gate agenda"
+    run_agent debate-judge "$T" "$OUT/agenda.md" "$OUT/raw/f1b-agenda.json" || abort "agenda failed (AGENDA=0 skips it)"
+  else log "reuse $OUT/agenda.md"; fi
+  gate_one agenda debate-judge "$OUT/agenda.md" "$T" "$OUT/raw/f1b-agenda.json" || abort "agenda gate"
 fi
 
-# fase 2 - proposta cega
-fase_painel proposta f2 || abort "fase proposta"
-gate_painel proposta f2 || abort "gate proposta"
+# phase 2 - blind proposal
+panel_phase proposal f2 || abort "proposal phase"
+panel_gate proposal f2 || abort "proposal gate"
 
-# fase 3 e 4 - ataque e fact-check
+# phases 3 and 4 - critique and fact-check
 if [ "$ROUNDS" -ge 2 ]; then
-  fase_painel ataque f3 || abort "fase ataque"
-  gate_painel ataque f3 || abort "gate ataque"
-  if [ "$FACTCHECK" = "1" ] && ! grep -q '^pulado' "$OUT/research.md"; then
-    if need "$OUT/research-check.md" || grep -q '^pulado\|^falhou' "$OUT/research-check.md"; then
-      run_agent debate-research "modo fact-check: le research-template.md (secao Fact-check), proposals/ e critiques/; responde so com a tabela de fact-check" \
+  panel_phase critique f3 || abort "critique phase"
+  panel_gate critique f3 || abort "critique gate"
+  if [ "$FACTCHECK" = "1" ] && ! grep -q '^skipped' "$OUT/research.md"; then
+    if need "$OUT/research-check.md" || grep -q '^skipped\|^failed' "$OUT/research-check.md"; then
+      run_agent debate-research "phase fact-check: read research-template.md (Fact-check section), proposals/ and critiques/; reply only with the fact-check table" \
         "$OUT/research-check.md" "$OUT/raw/f4-factcheck.json" \
-        || printf '# Fact-check\n\nfalhou: ver raw/f4-factcheck.json.tmp.stderr\n' > "$OUT/research-check.md"
-    else log "reuso $OUT/research-check.md"; fi
+        || printf '# Fact-check\n\nfailed: see raw/f4-factcheck.json.tmp.stderr\n' > "$OUT/research-check.md"
+    else log "reuse $OUT/research-check.md"; fi
   fi
 fi
-[ -s "$OUT/research-check.md" ] || printf '# Fact-check\n\npulado: rounds=%s FACTCHECK=%s\n' "$ROUNDS" "$FACTCHECK" > "$OUT/research-check.md"
+[ -s "$OUT/research-check.md" ] || printf '# Fact-check\n\nskipped: rounds=%s FACTCHECK=%s\n' "$ROUNDS" "$FACTCHECK" > "$OUT/research-check.md"
 
-# fase 5 - replica
+# phase 5 - rebuttal
 if [ "$ROUNDS" -ge 3 ]; then
-  # Sem veto contra si, nao ha o que replicar: a proposta r1 segue valendo e a chamada se economiza.
-  v="$(vetados "$OUT")"
+  # Without a veto against it, there is nothing to rebut: the r1 proposal stands and the call is saved.
+  v="$(vetoed "$OUT")"
   if [ -n "$v" ]; then
-    fase_painel replica f5 "$v" || log "replica parcial, juiz usa r1 onde faltar"
+    panel_phase rebuttal f5 "$v" || log "partial rebuttal, the judge uses r1 where it is missing"
     for a in $v; do
-      d="$(dest_for replica "$a")"
-      if [ -s "$d" ] && ! { has "$d" 'aceito' && has "$d" 'refuto'; }; then log "aviso: replica de $a sem Aceito ou Refuto"; fi
+      d="$(dest_for rebuttal "$a")"
+      if [ -s "$d" ] && ! { has "$d" 'accepted' && has "$d" 'rebutted'; }; then log "warning: rebuttal from $a without Accepted or Rebutted"; fi
     done
-  else log "sem veto contra o painel, replica pulada"; fi
+  else log "no veto against the panel, rebuttal skipped"; fi
 fi
 
-# fase 6 - juiz, ADRs, SDD
-T="fase decisao: le brief.md, constitution.md, research.md, research-check.md, agenda.md, regras-debate.md, adr-template.md, proposals/ (prefere *-r2) e critiques/; responde so com o decision.md"
+# phase 6 - judge, ADRs, SDD
+T="phase decision: read brief.md, constitution.md, research.md, research-check.md, agenda.md, debate-rules.md, adr-template.md, proposals/ (prefer *-r2) and critiques/; reply only with decision.md"
 if need "$OUT/decision.md"; then
-  run_agent debate-judge "$T" "$OUT/decision.md" "$OUT/raw/f6-decision.json" || abort "juiz decision"
-else log "reuso $OUT/decision.md"; fi
-gate_one decisao debate-judge "$OUT/decision.md" "$T" "$OUT/raw/f6-decision.json" || abort "gate decisao"
-log "ADRs: $(split_adrs "$OUT") em adr/"
+  run_agent debate-judge "$T" "$OUT/decision.md" "$OUT/raw/f6-decision.json" || abort "judge decision"
+else log "reuse $OUT/decision.md"; fi
+gate_one decision debate-judge "$OUT/decision.md" "$T" "$OUT/raw/f6-decision.json" || abort "decision gate"
+log "ADRs: $(split_adrs "$OUT") in adr/"
 
-T="fase sdd: le brief.md, constitution.md, research.md, decision.md, adr/, sdd-template.md e visual-contract.md; responde so com o SDD.md completo"
+T="phase sdd: read brief.md, constitution.md, research.md, decision.md, adr/, sdd-template.md and visual-contract.md; reply only with the full SDD.md"
 if need "$OUT/SDD.md"; then
-  run_agent debate-judge "$T" "$OUT/SDD.md" "$OUT/raw/f6-sdd.json" || abort "juiz SDD"
-else log "reuso $OUT/SDD.md"; fi
-gate_one sdd debate-judge "$OUT/SDD.md" "$T" "$OUT/raw/f6-sdd.json" || abort "gate SDD"
+  run_agent debate-judge "$T" "$OUT/SDD.md" "$OUT/raw/f6-sdd.json" || abort "judge SDD"
+else log "reuse $OUT/SDD.md"; fi
+gate_one sdd debate-judge "$OUT/SDD.md" "$T" "$OUT/raw/f6-sdd.json" || abort "SDD gate"
 
-# Auditoria independente: quem escreveu nao se corrige sozinho. Saida curta, e o SDD so e reemitido se houver defeito.
+# Independent audit: the author does not catch their own omissions. Short output, and the SDD is re-emitted only on a defect.
 if [ "$REVIEW" = "1" ]; then
-  TA="fase auditoria: le SDD.md, brief.md, constitution.md, decision.md, adr/, research-check.md e auditoria-template.md; responde so com o auditoria.md"
-  # Auditoria aprovada e curta de proposito.
-  MINIMO=1
-  if need "$OUT/auditoria.md"; then
-    if ! run_agent debate-auditor "$TA" "$OUT/auditoria.md" "$OUT/raw/f6-auditoria.json"; then
-      log "auditoria falhou, SDD segue sem auditoria"
+  TA="phase audit: read SDD.md, brief.md, constitution.md, decision.md, adr/, research-check.md and audit-template.md; reply only with audit.md"
+  # An approved audit is short on purpose.
+  MINIMUM=1
+  if need "$OUT/audit.md"; then
+    if ! run_agent debate-auditor "$TA" "$OUT/audit.md" "$OUT/raw/f6-audit.json"; then
+      log "audit failed, the SDD goes on without an audit"
     fi
-  else log "reuso $OUT/auditoria.md"; fi
-  if [ -s "$OUT/auditoria.md" ]; then
-    gate_one auditoria debate-auditor "$OUT/auditoria.md" "$TA" "$OUT/raw/f6-auditoria.json" || abort "gate auditoria"
-    MINIMO=""
-    if grep -q '^Veredito: CORRIGIR' "$OUT/auditoria.md"; then
-      log "auditoria: $(grep -cE '^\|[ *]*A[0-9]+[ *]*\|' "$OUT/auditoria.md") defeito(s), corrigindo o SDD"
-      TC="fase correcao: le auditoria.md, SDD.md, brief.md, decision.md e adr/; aplica cada linha An e responde so com o SDD.md completo corrigido"
-      run_agent debate-judge "$TC" "$OUT/SDD.md" "$OUT/raw/f6-sdd-correcao.json" || abort "correcao do SDD"
-      gate_one sdd debate-judge "$OUT/SDD.md" "$TC" "$OUT/raw/f6-sdd-correcao.json" || abort "gate SDD apos auditoria"
-      sed 's/^Veredito: CORRIGIR/Veredito: APLICADO/' "$OUT/auditoria.md" > "$OUT/auditoria.md.n"; mv "$OUT/auditoria.md.n" "$OUT/auditoria.md"
+  else log "reuse $OUT/audit.md"; fi
+  if [ -s "$OUT/audit.md" ]; then
+    gate_one audit debate-auditor "$OUT/audit.md" "$TA" "$OUT/raw/f6-audit.json" || abort "audit gate"
+    MINIMUM=""
+    if grep -q '^Verdict: FIX' "$OUT/audit.md"; then
+      log "audit: $(grep -cE '^\|[ *]*A[0-9]+[ *]*\|' "$OUT/audit.md") defect(s), fixing the SDD"
+      TC="phase fix: read audit.md, SDD.md, brief.md, decision.md and adr/; apply every An row and reply only with the full corrected SDD.md"
+      run_agent debate-judge "$TC" "$OUT/SDD.md" "$OUT/raw/f6-sdd-fix.json" || abort "SDD fix"
+      gate_one sdd debate-judge "$OUT/SDD.md" "$TC" "$OUT/raw/f6-sdd-fix.json" || abort "SDD gate after audit"
+      sed 's/^Verdict: FIX/Verdict: APPLIED/' "$OUT/audit.md" > "$OUT/audit.md.n"; mv "$OUT/audit.md.n" "$OUT/audit.md"
     fi
   fi
-  MINIMO=""
+  MINIMUM=""
 fi
 
 if "$SCRIPT_DIR/style-tile.sh" "$OUT" >> "$SUMMARY" 2>&1; then log "style tile: $OUT/style-tile.html"
-else log "style tile falhou, ver $SUMMARY"; fi
+else log "style tile failed, see $SUMMARY"; fi
 
-# fase 6d - marca: o diretor de arte fecha o brandbook e adapta as telas do SDD a marca. So com debate-brand no painel.
-if no_painel debate-brand; then
-  le_m="brief.md, SDD.md, decision.md, brandbook-template.md, visual-contract.md"
+# phase 6d - brand: the art director closes the brandbook and adapts the SDD screens to the brand. Only with debate-brand on the panel.
+if on_panel debate-brand; then
+  reads_b="brief.md, SDD.md, decision.md, brandbook-template.md, visual-contract.md"
   for x in proposals/debate-brand-r2.md proposals/debate-brand.md proposals/debate-design.md critiques/debate-ux.md; do
-    [ -s "$OUT/$x" ] && le_m="$le_m, $x"
+    [ -s "$OUT/$x" ] && reads_b="$reads_b, $x"
   done
-  T="fase marca: le $le_m; responde so com o BRANDBOOK.md completo"
+  T="phase brand: read $reads_b; reply only with the full BRANDBOOK.md"
   if need "$OUT/BRANDBOOK.md"; then
-    run_agent debate-brand "$T" "$OUT/BRANDBOOK.md" "$OUT/raw/f6-marca.json" || abort "marca"
-  else log "reuso $OUT/BRANDBOOK.md"; fi
-  gate_one marca debate-brand "$OUT/BRANDBOOK.md" "$T" "$OUT/raw/f6-marca.json" || abort "gate marca"
+    run_agent debate-brand "$T" "$OUT/BRANDBOOK.md" "$OUT/raw/f6-brand.json" || abort "brand"
+  else log "reuse $OUT/BRANDBOOK.md"; fi
+  gate_one brand debate-brand "$OUT/BRANDBOOK.md" "$T" "$OUT/raw/f6-brand.json" || abort "brand gate"
 fi
 
-# fase 7 - specs: 1 chamada por item do indice de decision.md, em paralelo
-spec_pendente() { [ ! -s "$1/spec.md" ] || grep -q '<nn>\|<slug>\|<quem>' "$1/spec.md"; }
-spec_tarefa() {
-  printf 'fase spec: gera spec, plan e tasks da spec %s; le brief.md, SDD.md, decision.md, adr/, visual-contract.md, spec-template.md, plan-template.md e tasks-template.md; responde so com os 3 arquivos, cada um aberto pela linha <!-- arquivo: nome -->' "${1##*/}"
+# phase 7 - specs: 1 call per item of the decision.md index, in parallel
+spec_pending() { [ ! -s "$1/spec.md" ] || grep -q '<nn>\|<slug>\|<who>' "$1/spec.md"; }
+spec_task() {
+  printf 'phase spec: write spec, plan and tasks for spec %s; read brief.md, SDD.md, decision.md, adr/, visual-contract.md, spec-template.md, plan-template.md and tasks-template.md; reply only with the 3 files, each opened by the line <!-- file: name -->' "${1##*/}"
 }
-spec_separa() {
+spec_split() {
   awk -v d="$1" '
-    /^<!-- arquivo: (spec|plan|tasks)\.md -->[[:space:]]*$/ { if (f != "") close(f); n = $3; f = d "/" n; printf "" > f; next }
+    /^<!-- file: (spec|plan|tasks)\.md -->[[:space:]]*$/ { if (f != "") close(f); n = $3; f = d "/" n; printf "" > f; next }
     f != "" { print > f }' "$2"
 }
 if [ "$SPECS" = "1" ]; then
@@ -501,47 +503,47 @@ if [ "$SPECS" = "1" ]; then
   fi
   for d in "$OUT"/specs/[0-9]*/; do
     d="${d%/}"; b="${d##*/}"
-    spec_pendente "$d" && launch debate-arch "$(spec_tarefa "$d")" "$OUT/raw/f7-$b.md" "$OUT/raw/f7-$b.json" forca
+    spec_pending "$d" && launch debate-arch "$(spec_task "$d")" "$OUT/raw/f7-$b.md" "$OUT/raw/f7-$b.json" force
   done
-  wait_all "fase specs" || abort "fase specs"
+  wait_all "specs phase" || abort "specs phase"
   for d in "$OUT"/specs/[0-9]*/; do
     d="${d%/}"; b="${d##*/}"
-    if spec_pendente "$d" && [ -s "$OUT/raw/f7-$b.md" ]; then spec_separa "$d" "$OUT/raw/f7-$b.md"; fi
+    if spec_pending "$d" && [ -s "$OUT/raw/f7-$b.md" ]; then spec_split "$d" "$OUT/raw/f7-$b.md"; fi
     r="$(check spec - "$d")"
     [ -z "$r" ] && continue
-    log "gate spec reprovado em $b: $r"
-    [ "$REPAIR" = "1" ] || abort "gate specs"
-    run_agent debate-arch "$(reparo "$(spec_tarefa "$d")" "raw/f7-$b.md" "$r")" "$OUT/raw/f7-$b.md" "$OUT/raw/f7-$b-reparo.json" || abort "reparo da spec $b"
-    spec_separa "$d" "$OUT/raw/f7-$b.md"
+    log "spec gate failed on $b: $r"
+    [ "$REPAIR" = "1" ] || abort "specs gate"
+    run_agent debate-arch "$(repair "$(spec_task "$d")" "raw/f7-$b.md" "$r")" "$OUT/raw/f7-$b.md" "$OUT/raw/f7-$b-repair.json" || abort "repair of spec $b"
+    spec_split "$d" "$OUT/raw/f7-$b.md"
     r="$(check spec - "$d")"
-    [ -z "$r" ] || abort "gate spec apos reparo em $b: $r"
+    [ -z "$r" ] || abort "spec gate after repair on $b: $r"
   done
-  log "gate specs ok"
+  log "specs gate ok"
 fi
 
-# fase 8 - backlog, so com specs preenchidas
+# phase 8 - backlog, only with filled specs
 SPECS_OK=0
-if ls "$OUT"/specs/[0-9]*/spec.md >/dev/null 2>&1 && ! grep -l '<nn>\|<slug>\|<quem>' "$OUT"/specs/*/spec.md >/dev/null 2>&1; then SPECS_OK=1; fi
+if ls "$OUT"/specs/[0-9]*/spec.md >/dev/null 2>&1 && ! grep -l '<nn>\|<slug>\|<who>' "$OUT"/specs/*/spec.md >/dev/null 2>&1; then SPECS_OK=1; fi
 if [ "$SPECS_OK" = "1" ]; then
   mkdir -p "$OUT/backlog"
-  LE="le SDD.md, adr/, specs/, lapidacao.md e backlog-template.md"
-  BB=""; [ -s "$OUT/BRANDBOOK.md" ] && BB=" e BRANDBOOK.md"
-  launch debate-ux "fase backlog-design: $LE$BB; responde so com o rascunho de itens" "$OUT/backlog/design.md" "$OUT/raw/f8-design.json"
-  launch debate-arch "fase backlog-eng: $LE; responde so com o rascunho de itens" "$OUT/backlog/eng.md" "$OUT/raw/f8-eng.json"
-  wait_all "fase trilhas" || abort "fase trilhas"
-  T="fase backlog: le brief.md, SDD.md, decision.md, adr/, specs/*/tasks.md, backlog/design.md, backlog/eng.md$BB, lapidacao.md e backlog-template.md; responde so com o BACKLOG.md"
-  if need "$OUT/BACKLOG.md"; then run_agent debate-pm "$T" "$OUT/BACKLOG.md" "$OUT/raw/f8-backlog.json" || abort "pm backlog"; else log "reuso $OUT/BACKLOG.md"; fi
-  gate_one backlog debate-pm "$OUT/BACKLOG.md" "$T" "$OUT/raw/f8-backlog.json" || abort "gate backlog"
+  READS="read SDD.md, adr/, specs/, polish.md and backlog-template.md"
+  BB=""; [ -s "$OUT/BRANDBOOK.md" ] && BB=" and BRANDBOOK.md"
+  launch debate-ux "phase backlog-design: $READS$BB; reply only with the draft items" "$OUT/backlog/design.md" "$OUT/raw/f8-design.json"
+  launch debate-arch "phase backlog-eng: $READS; reply only with the draft items" "$OUT/backlog/eng.md" "$OUT/raw/f8-eng.json"
+  wait_all "tracks phase" || abort "tracks phase"
+  T="phase backlog: read brief.md, SDD.md, decision.md, adr/, specs/*/tasks.md, backlog/design.md, backlog/eng.md$BB, polish.md and backlog-template.md; reply only with BACKLOG.md"
+  if need "$OUT/BACKLOG.md"; then run_agent debate-pm "$T" "$OUT/BACKLOG.md" "$OUT/raw/f8-backlog.json" || abort "pm backlog"; else log "reuse $OUT/BACKLOG.md"; fi
+  gate_one backlog debate-pm "$OUT/BACKLOG.md" "$T" "$OUT/raw/f8-backlog.json" || abort "backlog gate"
   "$SCRIPT_DIR/backlog-export.sh" "$OUT" | tee -a "$SUMMARY"
 fi
 
-metricas() {
-  [ -s "$METRICAS" ] || return 0
-  awk -F'\t' -v parede="$(($(date +%s) - INICIO))" '
-    { n++; s += $3; rep += ($1 ~ /reparo/); ret += ($4 > 1 ? $4 - 1 : 0); if ($3 > m) { m = $3; q = $1 } }
-    END { printf "tempo: %d s neste run; historico do caso: %d chamadas, %d s de modelo, %d reparo(s), %d retentativa(s); a mais lenta foi %s (%d s)\n", parede, n, s, rep, ret, q, m }' "$METRICAS"
+metrics() {
+  [ -s "$METRICS" ] || return 0
+  awk -F'\t' -v wall="$(($(date +%s) - START))" '
+    { n++; s += $3; rep += ($1 ~ /repair/); ret += ($4 > 1 ? $4 - 1 : 0); if ($3 > m) { m = $3; q = $1 } }
+    END { printf "time: %d s in this run; case history: %d calls, %d s of model time, %d repair(s), %d retry(ies); the slowest was %s (%d s)\n", wall, n, s, rep, ret, q, m }' "$METRICS"
 }
-log "$(metricas)"
-log "debate ok: decision.md, adr/, SDD.md, style-tile.html$([ -s "$OUT/BRANDBOOK.md" ] && printf ', BRANDBOOK.md') em $OUT"
+log "$(metrics)"
+log "debate ok: decision.md, adr/, SDD.md, style-tile.html$([ -s "$OUT/BRANDBOOK.md" ] && printf ', BRANDBOOK.md') in $OUT"
 if [ "$SPECS_OK" = "1" ]; then log "backlog ok: BACKLOG.md, backlog.csv, backlog.json, backlog-gh.sh"
-else log "proximo: preencher as specs (make-specs.sh, com SPECS=0) e rodar debate.sh de novo para a fase 8 (backlog)"; fi
+else log "next: fill the specs (make-specs.sh, with SPECS=0) and run debate.sh again for phase 8 (backlog)"; fi

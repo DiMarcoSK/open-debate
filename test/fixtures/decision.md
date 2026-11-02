@@ -1,140 +1,140 @@
-# Decisao
+# Decision
 
-## 1. Pesos
-velocidade=40 custo=30 prazo=30
+## 1. Weights
+speed=40 cost=30 deadline=30
 
-## 2. Placar
+## 2. Scores
 
-### D1 Monolito ou servicos
+### D1 Monolith or services
 
-| Opcao | velocidade | custo | prazo | Total |
+| Option | speed | cost | deadline | Total |
 |---|---|---|---|---|
-| Monolito | 4 | 4 | 5 | 430 |
-| Servicos | 3 | 2 | 4 | 300 |
+| Monolith | 4 | 4 | 5 | 430 |
+| Services | 3 | 2 | 4 | 300 |
 
-### D2 Direcao visual
+### D2 Visual direction
 
-| Opcao | velocidade | custo | prazo | Total |
+| Option | speed | cost | deadline | Total |
 |---|---|---|---|---|
-| Densa | 5 | 3 | 3 | 380 |
-| Leve | 3 | 3 | 3 | 300 |
+| Dense | 5 | 3 | 3 | 380 |
+| Light | 3 | 3 | 3 | 300 |
 
-### D3 Banco
+### D3 Database
 
-| Opcao | velocidade | custo | prazo | Total |
+| Option | speed | cost | deadline | Total |
 |---|---|---|---|---|
 | Cloud SQL | 4 | 4 | 4 | 400 |
 | Firestore | 4 | 3 | 3 | 340 |
 
 ## 3. ADRs
 
-## ADR-0001 Usar monolito modular
+## ADR-0001 Use a modular monolith
 
-- Status: aceito
+- Status: accepted
 
-### Contexto e problema
+### Context and problem
 
-Driver e numero.
+Driver and number.
 
-### Opcoes consideradas
-
-- A
-- B
-
-### Resultado da decisao
-
-Escolhida: "A", porque 80 x 60.
-
-### Consequencias
-
-- Bom: simples
-
-### Confirmacao
-
-Teste no CI.
-
-### Dissenso
-
-nenhum
-
-## ADR-0002 Usar Cloud Run
-
-- Status: aceito
-
-### Contexto e problema
-
-Driver e numero.
-
-### Opcoes consideradas
+### Considered options
 
 - A
 - B
 
-### Resultado da decisao
+### Decision outcome
 
-Escolhida: "A", porque 80 x 60.
+Chosen: "A", because 80 x 60.
 
-### Consequencias
+### Consequences
 
-- Bom: simples
+- Good: simple
 
-### Confirmacao
+### Confirmation
 
-Teste no CI.
+Test in CI.
 
-### Dissenso
+### Dissent
 
-nenhum
+none
 
-## ADR-0003 Usar Cloud SQL
+## ADR-0002 Use Cloud Run
 
-- Status: aceito
+- Status: accepted
 
-### Contexto e problema
+### Context and problem
 
-Driver e numero.
+Driver and number.
 
-### Opcoes consideradas
+### Considered options
 
 - A
 - B
 
-### Resultado da decisao
+### Decision outcome
 
-Escolhida: "A", porque 80 x 60.
+Chosen: "A", because 80 x 60.
 
-### Consequencias
+### Consequences
 
-- Bom: simples
+- Good: simple
 
-### Confirmacao
+### Confirmation
 
-Teste no CI.
+Test in CI.
 
-### Dissenso
+### Dissent
 
-nenhum
+none
+
+## ADR-0003 Use Cloud SQL
+
+- Status: accepted
+
+### Context and problem
+
+Driver and number.
+
+### Considered options
+
+- A
+- B
+
+### Decision outcome
+
+Chosen: "A", because 80 x 60.
+
+### Consequences
+
+- Good: simple
+
+### Confirmation
+
+Test in CI.
+
+### Dissent
+
+none
 
 ## 7. Specs
 
-`01 ingestao` - recebe alertas
-`02 triagem` - fila de triagem
-`03 relatorio` - relatorio diario
+`01 ingestion` - receives alerts
+`02 triage` - triage queue
+`03 report` - daily report
 
-## 8. Dissenso
+## 8. Dissent
 
-debate-k8s: portabilidade; reabre se > 10 servicos
+debate-k8s: portability; reopens if > 10 services
 
-## 9. Vetos
+## 9. Vetoes
 
-| Alvo | Veto | Resultado | Motivo |
+| Target | Veto | Ruling | Reason |
 |---|---|---|---|
-| debate-gcp | budget | mantido | custo |
-| debate-gcp | budget | mantido | custo |
-| debate-design | budget | rejeitado | fora do papel |
-| debate-arch | budget | rejeitado | fora do papel |
-| debate-x0 | budget | rejeitado | fora do papel |
-| debate-x1 | budget | rejeitado | fora do papel |
-| debate-x2 | budget | rejeitado | fora do papel |
-| debate-x3 | budget | rejeitado | fora do papel |
-| debate-x4 | budget | rejeitado | fora do papel |
+| debate-gcp | budget | upheld | cost |
+| debate-gcp | budget | upheld | cost |
+| debate-design | budget | rejected | outside the role |
+| debate-arch | budget | rejected | outside the role |
+| debate-x0 | budget | rejected | outside the role |
+| debate-x1 | budget | rejected | outside the role |
+| debate-x2 | budget | rejected | outside the role |
+| debate-x3 | budget | rejected | outside the role |
+| debate-x4 | budget | rejected | outside the role |

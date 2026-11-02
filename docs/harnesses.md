@@ -51,23 +51,23 @@ In `open-debate run`, calls are read-only whenever the harness offers that mode,
 
 ## Models
 
-On opencode, `modelos.conf` sets 1 model per agent. Elsewhere, the agent inherits the session model. To pin a model, edit the agent's `model` line, or uncomment it where it ships commented out (Codex, Copilot, oh-my-pi). Your choice survives `update`.
+On opencode, `models.conf` sets 1 model per agent. Elsewhere, the agent inherits the session model. To pin a model, edit the agent's `model` line, or uncomment it where it ships commented out (Codex, Copilot, oh-my-pi). Your choice survives `update`.
 
 On a harness with a single model, proposals tend to look alike. For different model families, use a mixed panel:
 
 ```sh
-open-debate run <case> --harness claude --mesa claude,codex,gemini
+open-debate run <case> --harness claude --mix claude,codex,gemini
 ```
 
-`--mesa` rotates the panel across the harnesses. `--harness` sets who runs research, judge and backlog. For full control, use routes:
+`--mix` rotates the panel across the harnesses. `--harness` sets who runs research, judge and backlog. For full control, use routes:
 
 ```sh
-ROTAS="debate-arch=claude debate-ux=codex:<model>" open-debate run <case> --harness claude
+ROUTES="debate-arch=claude debate-ux=codex:<model>" open-debate run <case> --harness claude
 ```
 
 On Claude Code, `debate-scout` is installed with `model: haiku` and the other agents inherit the session model. Change that line to pick another one; `update` keeps your choice.
 
-Parallel calls hit provider limits together. If a run keeps waiting on limits, lower `PARALELO`.
+Parallel calls hit provider limits together. If a run keeps waiting on limits, lower `PARALLEL`.
 
 ## Other CLIs
 

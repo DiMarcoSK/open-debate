@@ -32,7 +32,7 @@ docs/harnesses.md harness matrix and the evidence for each
 
 ## Rules
 
-- Commits, documentation and the README are in English. Prompts, templates, gates and CLI messages are in Portuguese.
+- Everything is in English: commits, docs, prompts, templates, gate keywords and CLI messages. User input can be in any language; panel triggers in `panel.conf` list English and Portuguese words.
 - POSIX shell, with no dependencies beyond `jq`, `awk` and `perl`. Linux `sh` is dash and awk may be mawk: no bashisms or gawkisms.
 - Gates are deterministic. If a rule matters, it becomes a check in `gates.sh`, not just a prompt instruction.
 - A gate bug gets a fixture and a test in `test/run.sh`.
@@ -47,8 +47,8 @@ Agents and `gates.sh` are a contract: gates read words and formats from the temp
 ## Adding a specialist
 
 1. Add `personas/debate-<x>.md` with the same frontmatter. State what it owns, what it does not own, its method and its proposal format, with `Posicoes` first.
-2. Add its line to `modelos.conf`, to `references/painel.conf` (`base` or `opcional` with its trigger words), and to the specialist list in `template/entry/subagents.md`.
-3. Add its role checks and line ceiling to `gates.sh`, a `proposta-<x>.md` fixture, and the first words of its `You are the ...` line to `test/stub/harness`.
+2. Add its line to `models.conf`, to `references/panel.conf` (`base` or `optional` with its trigger words), and to the specialist list in `template/entry/subagents.md`.
+3. Add its role checks and line ceiling to `gates.sh`, a `proposal-<x>.md` fixture, and the first words of its `You are the ...` line to `test/stub/harness`.
 
 ## Tests
 

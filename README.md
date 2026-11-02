@@ -10,16 +10,16 @@ You describe the idea. A panel of specialists researches it, agrees on which dec
 ```text
 you:  /debate alert triage platform for a small SOC
 
-fase 1 pesquisa: ok, 18 achados
-fase 1b agenda: 5 decisoes em disputa
-painel: arch, ux, pm + design, brand, sec (pelo brief)
-fase 2 proposta: 6/6 ok, ux reparado (contraste tinta/papel)
-fase 3 ataque: 4/4 ok
-fase 6 decisao: 5 ADRs, 4 specs; auditoria: 1 defeito corrigido
-fase 8 backlog: 42 itens, 61 dias, caminho critico B01 -> B07 -> B19 -> B33
+phase 1 research: ok, 18 findings
+phase 1b agenda: 5 contested decisions
+panel: arch, ux, pm + design, brand, sec (from the brief)
+phase 2 proposal: 6/6 ok, ux repaired (ink/paper contrast)
+phase 3 critique: 4/4 ok
+phase 6 decision: 5 ADRs, 4 specs; audit: 1 defect fixed
+phase 8 backlog: 42 items, 61 days, critical path B01 -> B07 -> B19 -> B33
 ```
 
-The numbers above illustrate the output format. Agents and artifacts currently work in Brazilian Portuguese, see [Limitations](#limitations).
+The numbers above illustrate the output format. Write the idea and answer the intake in any language: the agent talks back in yours, and every artifact is written in English.
 
 ## Install
 
@@ -77,7 +77,7 @@ open-debate init --project                 # current project instead of user lev
 | `research.md` | Findings with URLs, prior art, prices and limits, gaps |
 | `agenda.md` | The 3-8 decisions in dispute, with options, owner and deciding driver |
 | `decision.md`, `adr/` | Weighted matrix and MADR 4.0 ADRs, with rejected alternatives, dissent and a ruling on every veto |
-| `SDD.md`, `auditoria.md` | Lean arc42 design doc, with C4 in mermaid, capacity, failures and STRIDE, plus its independent audit |
+| `SDD.md`, `audit.md` | Lean arc42 design doc, with C4 in mermaid, capacity, failures and STRIDE, plus its independent audit |
 | `style-tile.html`, `tokens.json`, `tokens.css` | Visual direction with measured WCAG 2.2 contrast, W3C DTCG tokens |
 | `BRANDBOOK.md` | With `debate-brand` on the panel: brand platform, voice, logo, color, type, and every key screen adapted to the brand |
 | `specs/` | `spec.md`, `plan.md` and `tasks.md` per feature, GitHub Spec Kit style, with EARS requirements |
@@ -86,8 +86,8 @@ open-debate init --project                 # current project instead of user lev
 ## Why it works
 
 - **A shared agenda.** The judge lists the disputed decisions before anyone proposes. Every proposal takes a position on each one, so the judge compares answers to the same questions.
-- **Blind proposals.** Each specialist writes before seeing the others. From the command line, proposals and attacks run in a working directory that holds only what the agent may read.
-- **Attacks need evidence.** A veto requires a literal quote, a problem with a number and a concrete replacement. The gate looks the quote up in the cited file and rejects it if it is not there. Every veto gets a ruling.
+- **Blind proposals.** Each specialist writes before seeing the others. From the command line, proposals and critiques run in a working directory that holds only what the agent may read.
+- **Critiques need evidence.** A veto requires a literal quote, a problem with a number and a concrete replacement. The gate looks the quote up in the cited file and rejects it if it is not there. Every veto gets a ruling.
 - **A number without a source is an opinion.** Every number cites `research.md` or shows the math, and a citation to a finding that does not exist is rejected. Whatever the fact-check marks wrong scores zero in the matrix.
 - **The judge does not grade its own work.** An independent auditor lists provable defects in the SDD, and only those get corrected.
 - **Deterministic gates.** Scripts, not an LLM, check each phase and redo the math: contrast, matrix totals, weights, capacity, spec task coverage, dependency cycles. On failure, the agent gets the reason and 1 repair attempt.
@@ -98,7 +98,7 @@ open-debate init --project                 # current project instead of user lev
 ### In a session
 
 ```text
-/debate <idea> [--painel design,brand,sec] [--rounds 1-3] [--sem-pesquisa] [--sem-factcheck]
+/debate <idea> [--panel design,brand,sec] [--rounds 1-3] [--no-research] [--no-factcheck]
 ```
 
 The agent asks up to 6 intake questions and runs the phases. The case lives in `cases/<slug>/`. Running `/debate` again on an existing case resumes from the first phase that fails its gate.
@@ -119,20 +119,20 @@ To see where a case stands, or to redo part of it after editing an earlier artif
 
 ```sh
 open-debate status "$case"              # each phase, the next one, stale outputs, calls and model time
-open-debate run "$case" --from ataque   # archives that phase and the later ones in raw/arquivo, then redoes them
+open-debate run "$case" --from critique # archives that phase and the later ones in raw/archive, then redoes them
 ```
 
-`raw/metricas.tsv` records time, attempts and outcome per call, so you can see which phase is worth cutting. A rate limit waits with backoff; a login failure stops at once. `Ctrl-C` ends the calls in flight, and a second run on the same case is refused.
+`raw/metrics.tsv` records time, attempts and outcome per call, so you can see which phase is worth cutting. A rate limit waits with backoff; a login failure stops at once. `Ctrl-C` ends the calls in flight, and a second run on the same case is refused.
 
 ### Mixed panel
 
 A debate gets better when opinions come from different model families. If you have access to more than one CLI, spread the panel across them:
 
 ```sh
-open-debate run "$case" --harness claude --mesa claude,codex,gemini
+open-debate run "$case" --harness claude --mix claude,codex,gemini
 ```
 
-`--harness` runs research, judge and backlog, and `--mesa` rotates the panel. See [per-agent routes](docs/harnesses.md#models).
+`--harness` runs research, judge and backlog, and `--mix` rotates the panel. See [per-agent routes](docs/harnesses.md#models).
 
 ### Commands
 
@@ -141,13 +141,13 @@ open-debate run "$case" --harness claude --mesa claude,codex,gemini
 | `init`, `update`, `uninstall` | Manage the installation; accept `--harness`, `--all`, `--project` and `--force` |
 | `doctor [--live]` | Checks dependencies and installation; `--live` makes 1 real call |
 | `harnesses` | Lists supported harnesses and the state of each |
-| `models check\|apply\|free` | Check, apply or list opencode models |
-| `new`, `run`, `status` | Create, execute and inspect a case |
+| `models check\|apply\|free\|profile` | Check, apply, list opencode models or set the cost profile |
+| `new`, `run`, `status`, `panel` | Create, execute and inspect a case, and show the panel the brief triggers |
 | `specs` | Create specs by hand, for use with `SPECS=0` |
 | `gate`, `validate` | Run the gates for one phase or the whole case |
 | `backlog`, `tile` | Export the backlog and the style tile |
 
-`run` variables: `HARNESS`, `MODEL`, `MODEL_FALLBACK`, `MESA`, `ROTAS`, `HARNESS_CMD`, `PAINEL`, `FROM`, `RETRIES=2`, `TIMEOUT=600`, `BACKOFF=20`, `PARALELO=6` (simultaneous calls, 0 for no limit), `MAX_CHAMADAS=0` (hard limit per run, 0 for none), `MIN_LINES=5`, `RESEARCH=1`, `AGENDA=1`, `FACTCHECK=1`, `SPECS=1`, `REVIEW=1` (audit), `REPAIR=1`, `FRESH=0`.
+`run` variables: `HARNESS`, `MODEL`, `MODEL_FALLBACK`, `MIX`, `ROUTES`, `HARNESS_CMD`, `PANEL`, `FROM`, `RETRIES=2`, `TIMEOUT=600`, `BACKOFF=20`, `PARALLEL=6` (simultaneous calls, 0 for no limit), `MAX_CALLS=0` (hard limit per run, 0 for none), `MIN_LINES=5`, `RESEARCH=1`, `AGENDA=1`, `FACTCHECK=1`, `SPECS=1`, `REVIEW=1` (audit), `REPAIR=1`, `FRESH=0`.
 
 ## The protocol
 
@@ -156,7 +156,7 @@ flowchart TD
   A[Intake: brief and constitution] --> B[Research with parallel scouts]
   B --> B2[Agenda of disputed decisions]
   B2 --> C[Blind panel proposals]
-  C --> D[Attacks with citations]
+  C --> D[Critiques with quotes]
   D --> E[Fact-check]
   E --> F[Rebuttal by vetoed agents]
   F --> G[Judge: matrix, ADRs, SDD, tokens]
@@ -172,7 +172,7 @@ flowchart TD
 | 1 research | `debate-research`, `debate-scout` | 5+ distinct URLs, 5+ findings with a source, gaps section |
 | 1b agenda | `debate-judge` | 3-8 decisions, 2+ options, owner on the panel, deciding driver |
 | 2 proposal | panel | position on every agenda item, concession, only existing finding ids, length; plus role checks (C4, contrast, cost and IAM, rollback, STRIDE) |
-| 3 attack | panel | 1-3 vetoes, none against itself, quote found in the cited file, concession |
+| 3 critique | panel | 1-3 vetoes, none against itself, quote found in the cited file, concession |
 | 4 fact-check | `debate-research` | non-blocking |
 | 5 rebuttal | vetoed agents | non-blocking |
 | 6 decision and SDD | `debate-judge` | weights total 100, matrix math checks out, every agenda item, veto and wrong claim ruled on, 3+ MADR ADRs, 3-6 specs, dissent; SDD with every ADR, tokens identical to the decision, no placeholders |
@@ -181,17 +181,17 @@ flowchart TD
 | 7 specs | `debate-arch`, `debate-design` | EARS, cited ADRs exist, every user story has tasks |
 | 8 backlog | `debate-ux`, `debate-arch`, `debate-pm` | 15+ items, covers specs, tasks, ADRs and polish, no cycles, capacity math checks out and the plan fits |
 
-Details in [`protocol.md`](template/skills/architect-debate/references/protocol.md) and the [debate rules](template/skills/architect-debate/references/regras-debate.md).
+Details in [`protocol.md`](template/skills/architect-debate/references/protocol.md) and the [debate rules](template/skills/architect-debate/references/debate-rules.md).
 
 ## Customization
 
-**Models.** On opencode, `modelos.conf` sets 1 model per agent, under a cost profile: `gratis` (default, free models only), `misto` (a stronger model only on the seats that decide: orchestrator, judge, auditor, architecture) and `forte` (the stronger model everywhere, most tokens). Switch with `open-debate models profile misto <provider/model>`, any id from `opencode models`. Free models come and go from the catalog: `update` swaps only the ones that left, to the `reserva` and then a different free model per agent, so the panel does not pile on one rate limit. `open-debate models check` shows the state. On other harnesses, the agent inherits the session model, and you can pin another on its `model` line. Your choice survives `update`.
+**Models.** On opencode, `models.conf` sets 1 model per agent, under a cost profile: `free` (default, free models only), `mixed` (a stronger model only on the seats that decide: orchestrator, judge, auditor, architecture) and `strong` (the stronger model everywhere, most tokens). Switch with `open-debate models profile mixed <provider/model>`, any id from `opencode models`. Free models come and go from the catalog: `update` swaps only the ones that left, to the `spare` and then a different free model per agent, so the panel does not pile on one rate limit. `open-debate models check` shows the state. On other harnesses, the agent inherits the session model, and you can pin another on its `model` line. Your choice survives `update`.
 
-**Panel.** Three seats always sit: `debate-arch` (software architecture), `debate-ux` (UI and UX: usability goals, accessibility, the UI system and a review of every screen) and `debate-pm` (problem, metric, MVP cut, premises; it also writes the backlog). Research and judge always run outside the panel. The other seats join when the brief calls for them, up to 8 in total:
+**Panel.** Three seats always sit: `debate-arch` (software architecture), `debate-ux` (UI and UX: usability goals, accessibility, the UI system and a review of every screen) and `debate-pm` (problem, metric, MVP cut, assumptions; it also writes the backlog). Research and judge always run outside the panel. The other seats join when the brief calls for them, up to 8 in total:
 
 | Seat | Joins when the brief mentions |
 |---|---|
-| `debate-design` | screens: web, app, dashboard, portal. Decides what each screen holds; `debate-ux` reviews it in the attack phase |
+| `debate-design` | screens: web, app, dashboard, portal. Decides what each screen holds; `debate-ux` reviews it in the critique phase |
 | `debate-brand` | a public face: brand, B2C, consumers, store, launch. Art and creative director: brand identity and tokens, then `BRANDBOOK.md` adapting the designer's screens to the brand |
 | `debate-sec` | personal, financial, health or regulated data |
 | `debate-ai` | LLMs, RAG, agents, ML |
@@ -199,13 +199,13 @@ Details in [`protocol.md`](template/skills/architect-debate/references/protocol.
 | `debate-mobile` | iOS, Android, offline, push |
 | `debate-gcp`, `debate-aws`, `debate-k8s` | that cloud or a cluster |
 
-`open-debate painel <case>` shows the panel the brief triggers and the word that triggered each seat; `--grava design,brand` records a choice. `--painel design,brand` on `run` picks the seats by hand, and the base seats are added anyway. Triggers live in [`painel.conf`](template/skills/architect-debate/references/painel.conf); the "Fora do escopo" line and negative answers ("nenhum", "nao") never trigger a seat. For another cloud, create a persona modeled on `debate-aws.md` and add it there.
+`open-debate panel <case>` shows the panel the brief triggers and the word that triggered each seat; `--save design,brand` records a choice. `--panel design,brand` on `run` picks the seats by hand, and the base seats are added anyway. Triggers live in [`panel.conf`](template/skills/architect-debate/references/panel.conf), in English and Portuguese; the "Out of scope" line and negative answers ("none", "no", "nenhum") never trigger a seat. For another cloud, create a persona modeled on `debate-aws.md` and add it there.
 
 **Principles.** `constitution.md` is copied into each case, and the intake can adjust it. Breaking a principle requires a written override.
 
 ## Limitations
 
-- Templates, prompts and gates are in Portuguese, so artifacts come out in pt-BR.
+- Artifacts are always in English: gates check English headings and keywords. Input can be in any language.
 - Gates check form, traceability and numbers, not decision quality. Review the SDD and ADRs.
 - Blindness has limits. From the command line, the agent's working directory holds no rival output, but this is not an OS sandbox. In a session, blindness comes from the prompt naming only the allowed files, plus each harness's subagent isolation.
 - Cost and duration depend on the models. A full debate makes dozens of calls.

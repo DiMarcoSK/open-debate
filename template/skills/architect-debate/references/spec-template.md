@@ -2,38 +2,38 @@
 
 ADRs: <ADR-NNNN, ...>
 
-## 1. Objetivo
+## 1. Goal
 
-3 linhas: o que e, para quem, que problema some. Metrica de sucesso.
+3 lines: what it is, for whom, which problem goes away. Success metric.
 
 ## 2. User stories
 
-- US1 [P1] Como <quem> quero <o que> para <ganho>
+- US1 [P1] As a <who> I want <what> so that <gain>
 - US2 [P2] ...
 
-P1 entra no MVP, P2/P3 so com folga de prazo.
+P1 enters the MVP, P2/P3 only with deadline slack.
 
-## 3. Requisitos (EARS)
+## 3. Requirements (EARS)
 
-- R1 [US1] QUANDO <evento> O SISTEMA DEVE <resposta>. Criterio: <teste em 1 linha>
-- R2 [US1] SE <condicao indesejada> ENTAO O SISTEMA DEVE <resposta>. Criterio: ...
+- R1 [US1] WHEN <event> THE SYSTEM SHALL <response>. Criterion: <test in 1 line>
+- R2 [US1] IF <unwanted condition> THEN THE SYSTEM SHALL <response>. Criterion: ...
 
-1 criterio testavel por requisito. Inclui ao menos 1 requisito nao funcional com numero (latencia, volume, custo).
+1 testable criterion per requirement. At least 1 non-functional requirement with a number (latency, volume, cost).
 
-## 4. Fora do escopo
+## 4. Out of scope
 
-1 linha por item, com motivo.
+1 line per item, with the reason.
 
-## 5. Perguntas abertas
+## 5. Open questions
 
-Max 3, cada uma com opcao default e marca `[assumido, dono <nome>, <semana>]` se nao respondida.
+Max 3, each with a default option and the mark `[assumed, owner <name>, <week>]` when unanswered.
 
-## 6. Experiencia (ver visual-contract.md; spec sem UI escreve `sem UI` com motivo)
+## 6. Experience (see visual-contract.md; a spec without UI writes `no UI` with the reason)
 
-- Telas e tarefa critica (passos):
-- Tokens e componentes usados:
-- Vazio:
+- Screens and critical task (steps):
+- Tokens and components used:
+- Empty:
 - Loading:
-- Erro:
-- Sucesso:
-- Acessibilidade (teclado, foco, contraste):
+- Error:
+- Success:
+- Accessibility (keyboard, focus, contrast):

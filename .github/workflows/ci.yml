@@ -22,8 +22,8 @@ jobs:
       - uses: actions/checkout@v4
       - run: sh test/run.sh
 
-  # Cada push na main que passa no lint e nos testes vira a versao estavel: install.sh e `open-debate upgrade`
-  # baixam a tag stable, e quem tem instalado recebe o aviso de versao nova em ate 1 dia.
+  # Every push to main that passes lint and tests becomes the stable version: install.sh and `open-debate upgrade`
+  # download the stable tag, and existing installs get the new-version notice within 1 day.
   stable:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [lint, test]

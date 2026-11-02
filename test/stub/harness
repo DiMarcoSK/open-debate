@@ -1,8 +1,8 @@
 #!/bin/sh
-# Stub dos harnesses: o nome do link escolhe o formato de saida real daquele CLI. Sem rede e sem LLM.
+# Harness stub: the link name picks that CLI's real output format. No network and no LLM.
 set -eu
 self="$0"
-# So builtins onde da: cada processo a menos conta, o stub roda em toda chamada simulada da suite.
+# Builtins where possible: every process saved counts, the stub runs on every simulated call of the suite.
 real="$self"; [ ! -L "$self" ] || real="$(readlink "$self")"
 case "$real" in /*) ;; *) real="${self%/*}/$real" ;; esac
 FX="${real%/*}/../fixtures"
@@ -11,15 +11,15 @@ nome="${self##*/}"; [ "$nome" != "harness" ] || { nome="$1"; shift; }
 fim=""; p=""
 while [ "$#" -gt 0 ]; do
   case "$1" in -o) if [ "$nome" = "codex" ]; then fim="$2"; fi ;; esac
-  case "$1" in *"## Tarefa"*|"Responda"*) p="$1" ;; esac
+  case "$1" in *"## Task"*|"Reply with"*) p="$1" ;; esac
   shift
 done
-# Tarefa: 1a linha nao vazia depois de "## Tarefa". Papel: 1a linha "You are the ..." da persona.
+# Task: 1st non-empty line after "## Task". Role: the persona's 1st "You are the ..." line.
 tarefa=""; agente=""; depois=0
 while IFS= read -r l; do
   case "$l" in "You are the "*) [ -n "$agente" ] || agente="$l" ;; esac
   if [ "$depois" = 1 ] && [ -n "$l" ] && [ -z "$tarefa" ]; then tarefa="$l"; fi
-  case "$l" in "## Tarefa"*) depois=1 ;; esac
+  case "$l" in "## Task"*) depois=1 ;; esac
 done <<EOF_P
 $p
 EOF_P
@@ -31,29 +31,29 @@ case "$agente" in
   *) short=arch ;;
 esac
 case "$tarefa" in
-  "modo pesquisa"*) f=research.md ;;
-  "modo fact-check"*) f=research-check.md ;;
-  "fase agenda"*) f=agenda.md ;;
-  "fase proposta"*) f="proposta-$short.md" ;;
-  "fase ataque"*) f=ataque.md; [ "$short" = "ux" ] && f=ataque-ux.md ;;
-  "fase replica"*) f=replica.md ;;
-  "fase decisao"*) f=decision.md ;;
-  "fase sdd"*|"fase correcao"*) f=SDD.md ;;
-  "fase marca"*) f=BRANDBOOK.md ;;
-  "fase auditoria"*) f="${STUB_AUDITORIA:-auditoria.md}" ;;
-  "fase spec"*) f=spec-bundle.md ;;
-  "fase backlog-design"*|"fase backlog-eng"*) f=trilha.md ;;
-  "fase backlog"*) f=BACKLOG.md ;;
-  *"PRONTO"*) f="" ;;
-  *) echo "stub: tarefa desconhecida: $tarefa" >&2; exit 2 ;;
+  "phase research"*) f=research.md ;;
+  "phase fact-check"*) f=research-check.md ;;
+  "phase agenda"*) f=agenda.md ;;
+  "phase proposal"*) f="proposal-$short.md" ;;
+  "phase critique"*) f=critique.md; [ "$short" = "ux" ] && f=critique-ux.md ;;
+  "phase rebuttal"*) f=rebuttal.md ;;
+  "phase decision"*) f=decision.md ;;
+  "phase sdd"*|"phase fix"*) f=SDD.md ;;
+  "phase brand"*) f=BRANDBOOK.md ;;
+  "phase audit"*) f="${STUB_AUDIT:-audit.md}" ;;
+  "phase spec"*) f=spec-bundle.md ;;
+  "phase backlog-design"*|"phase backlog-eng"*) f=track.md ;;
+  "phase backlog"*) f=BACKLOG.md ;;
+  *"READY"*) f="" ;;
+  *) echo "stub: unknown task: $tarefa" >&2; exit 2 ;;
 esac
-if [ -z "$f" ]; then texto=PRONTO
+if [ -z "$f" ]; then texto=READY
 elif [ "${FAIL_ONCE:-}" = "$f" ] && [ ! -e "$STUB_STATE.$f" ]; then
-  : > "$STUB_STATE.$f"; texto="$(printf 'sem nada util\nlinha\nlinha\nlinha\nlinha\nlinha')"
+  : > "$STUB_STATE.$f"; texto="$(printf 'nothing useful\nline\nline\nline\nline\nline')"
 else
   texto="$(cat "$FX/$f")"
-  # Ataque de verdade mira um rival do painel: o nome sai da propria tarefa.
-  if [ "$f" = "ataque.md" ] || [ "$f" = "ataque-ux.md" ]; then
+  # A real critique targets a panel rival: the name comes from the task itself.
+  if [ "$f" = "critique.md" ] || [ "$f" = "critique-ux.md" ]; then
     r_="${tarefa#*proposals/debate-}"; rival="debate-${r_%%[!a-z0-9]*}"
     texto="$(printf '%s\n' "$texto" | sed "s/debate-gcp/$rival/g")"
   fi
@@ -62,6 +62,6 @@ case "$nome" in
   claude|cursor-agent|droid) printf '%s' "$texto" | jq -Rs '{type:"result",is_error:false,result:.}' -c ;;
   gemini|agy) printf '%s' "$texto" | jq -Rs '{response:.,stats:{}}' -c ;;
   qwen) printf '%s' "$texto" | jq -Rs '[{type:"system"},{type:"result",result:.}]' -c ;;
-  codex) printf '%s\n' "$texto" > "$fim"; echo "progresso que nao e resposta" ;;
+  codex) printf '%s\n' "$texto" > "$fim"; echo "progress that is not the answer" ;;
   *) printf '%s\n' "$texto" ;;
 esac

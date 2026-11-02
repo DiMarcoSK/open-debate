@@ -1,55 +1,40 @@
 # Brandbook - Fixture
 
-## 1. Plataforma de marca
-SOCs pequenos, promessa de calma.
-## 2. Personalidade, voz e tom
-Voz: direto, nao seco.
+## 1. Brand platform
+Small SOCs, a promise of calm.
+## 2. Personality, voice and tone
+Voice: direct, not dry.
 ## 3. Logo
-Torre em 3 tracos, minimo 24 px.
-## 4. Cor
+Tower in 3 strokes, minimum 24 px.
+## 4. Color
 ```
 TOKENS
-papel #F2EFE8
-superficie #FFFFFF
-tinta #16181D
-tinta-2 #4A4F5A
-linha #D9D4C7
-acento #0B5FFF
-acento-tinta #FFFFFF
+paper #F2EFE8
+surface #FFFFFF
+ink #16181D
+ink-2 #4A4F5A
+line #D9D4C7
+accent #0B5FFF
+on-accent #FFFFFF
 ok #1F6B3A
 warn #8A5100
 crit #A3231B
 display Instrument Serif
 body Inter
 mono JetBrains Mono
-escala 1.25 base 16
-espaco 4
-raio 6
-movimento 180ms cubic-bezier(.2,.8,.2,1)
-FIM
+scale 1.25 base 16
+space 4
+radius 6
+motion 180ms cubic-bezier(.2,.8,.2,1)
+END
 ```
-## 5. Experiencia e direcao visual
-**Conceito:** Torre de controle
-```
-```
-Vazio: 0 alertas.
-Loading: 8 linhas.
-Erro: falhou, tente de novo.
-Sucesso: triado.
-Parcial: 3 de 5.
-## 6. Cortes e backlog
-Cortes.
-## 7. Testes de aceitacao, SLO e fitness functions
-Testes.
-## 8. Riscos, dissenso e perguntas abertas
-Riscos.
-## 5. Tipografia
-Instrument Serif e Inter.
-## 6. Imagem, icones e motion
-Icones Lucide 1.5 px.
-## 7. Telas adaptadas
-| Tela | Elemento do design | Regra de marca aplicada | Token |
+## 5. Typography
+Instrument Serif and Inter.
+## 6. Imagery, icons and motion
+Lucide icons 1.5 px.
+## 7. Adapted screens
+| Screen | Design element | Brand rule applied | Token |
 |---|---|---|---|
-| fila | contador | numeral grande | display |
-## 8. Aplicacoes e governanca
-Favicon da torre.
+| queue | counter | large numeral | display |
+## 8. Applications and governance
+Tower favicon.

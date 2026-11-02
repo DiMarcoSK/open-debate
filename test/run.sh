@@ -1,6 +1,6 @@
 #!/bin/sh
-# run.sh - suite sem dependencias: CLI, instalador, gates e o protocolo inteiro com opencode stub.
-# Sai 1 se algum teste falhar.
+# run.sh - dependency-free suite: CLI, installer, gates and the whole protocol with an opencode stub.
+# Exits 1 if any test fails.
 set -u
 export LC_ALL=C
 
@@ -9,7 +9,7 @@ CLI="$ROOT/bin/open-debate"
 FX="$ROOT/test/fixtures"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
-# PATH hermetico: um harness real instalado na maquina nao pode ser detectado nem chamado pela suite.
+# Hermetic PATH: a real harness installed on the machine must not be detected or called by the suite.
 FERR="$WORK/ferramentas"; mkdir -p "$FERR"
 for c in jq perl; do ln -s "$(command -v "$c")" "$FERR/$c"; done
 export PATH="$ROOT/test/stub:$FERR:/usr/bin:/bin"
@@ -17,16 +17,16 @@ export HOME="$WORK/home" XDG_CONFIG_HOME="$WORK/home/.config"
 mkdir -p "$HOME"
 CFG="$XDG_CONFIG_HOME/opencode"
 SK="$CFG/skills/architect-debate"
-# CLIs falsos com o nome de cada harness: o nome do link escolhe o formato de saida.
+# Fake CLIs named after each harness: the link name picks the output format.
 FAKE="$WORK/fake"; mkdir -p "$FAKE"
 for h in claude codex cursor-agent gemini agy omp pi dsh droid copilot qwen cline; do ln -s "$ROOT/test/stub/harness" "$FAKE/$h"; done
 TODOS="opencode claude codex cursor gemini agy omp pi dsh droid copilot qwen cline"
 
 PASS=0; FAIL=0
-# Registro: `t` roda em sequencia (mexe no HOME ou na instalacao), `tp` roda em paralelo num pool de JOBS.
-# Cada teste roda num subshell com WORK, STUB_STATE e stdin proprios; o resultado sai na ordem do registro.
-# Fora de `if`: dentro dele o set -e seria ignorado e so a ultima linha do teste contaria.
-# Pelo mesmo motivo, asserts usam `nao` (nunca `! cmd`) e 1 comando por linha (nunca `a && b`).
+# Registry: `t` runs in sequence (touches HOME or the install), `tp` runs in parallel in a pool of JOBS.
+# Each test runs in a subshell with its own WORK, STUB_STATE and stdin; results print in registry order.
+# Outside `if`: inside it set -e would be ignored and only the test's last line would count.
+# For the same reason, asserts use `nao` (never `! cmd`) and 1 command per line (never `a && b`).
 JOBS="${JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)}"
 REG="$WORK/.registro"; : > "$REG"
 t() { n_="$1"; shift; printf 's|%s|%s\n' "$n_" "$*" >> "$REG"; }
@@ -43,20 +43,20 @@ relata() { # relata <dir> <nome>
   else FAIL=$((FAIL + 1)); printf 'FAIL %s\n' "$2"; sed 's/^/     /' "$1.saida"; fi
 }
 nao() { if "$@"; then return 1; fi; }
-existe() { for x in "$@"; do [ -e "$x" ] || { echo "ausente: $x"; return 1; }; done; }
-ausente() { for x in "$@"; do [ ! -e "$x" ] || { echo "sobrou: $x"; return 1; }; done; }
+existe() { for x in "$@"; do [ -e "$x" ] || { echo "missing: $x"; return 1; }; done; }
+ausente() { for x in "$@"; do [ ! -e "$x" ] || { echo "left over: $x"; return 1; }; done; }
 
 # --- CLI
 versao() { [ "$("$CLI" --version)" = "$(jq -r .version "$ROOT/package.json")" ]; }
 ajuda() { "$CLI" --help | grep -q 'open-debate init'; }
 desconhecido() { nao "$CLI" foobar; }
 symlink() { ln -s "$CLI" "$WORK/od"; "$WORK/od" --version; }
-tp "--version le package.json" versao
-tp "--help lista comandos" ajuda
-tp "comando desconhecido falha" desconhecido
-tp "funciona via symlink (npm bin)" symlink
+tp "--version reads package.json" versao
+tp "--help lists commands" ajuda
+tp "unknown command fails" desconhecido
+tp "works through a symlink (npm bin)" symlink
 
-# --- seguranca do pacote
+# --- package safety
 sem_vazamento() {
   grep -rnIE '/Users/|eskudo|apiKey|api_key|sk-[A-Za-z0-9]{20}|\.config/opencode' "$ROOT/template" "$ROOT/lib/install.sh" \
     | grep -v 'XDG_CONFIG_HOME' > "$WORK/vaza" || true
@@ -64,10 +64,10 @@ sem_vazamento() {
   [ ! -s "$WORK/vaza" ]
 }
 frontmatter_sem_glob_aberto() { nao grep -n '"\*[a-z-]*/scripts' "$ROOT/template/skills/architect-debate/personas/debate.md"; }
-tp "template sem caminho local nem segredo" sem_vazamento
-tp "permissao de bash nao usa glob aberto a esquerda" frontmatter_sem_glob_aberto
+tp "template has no local path or secret" sem_vazamento
+tp "bash permission does not use a left-open glob" frontmatter_sem_glob_aberto
 
-# --- instalador
+# --- installer
 init_global() {
   "$CLI" init --yes
   existe "$CFG/agents/debate-judge.md" "$CFG/commands/debate.md"
@@ -76,33 +76,33 @@ init_global() {
   grep -q '"~/.config/opencode/skills/architect-debate/scripts/\*": allow' "$CFG/agents/debate.md"
   grep -q "\"$SK/scripts/\*\": allow" "$CFG/agents/debate.md"
 }
-modelos_aplicados() { grep -q '^model: opencode/gratis-a$' "$CFG/agents/debate-judge.md"; }
-idempotente() { "$CLI" init | grep -q '0 novo(s), 0 atualizado(s), 0 sobrescrito(s)'; }
+modelos_aplicados() { grep -q '^model: opencode/free-a$' "$CFG/agents/debate-judge.md"; }
+idempotente() { "$CLI" init | grep -q '0 new, 0 updated, 0 overwritten'; }
 doctor_ok() { "$CLI" doctor; }
-t "init instala e renderiza caminhos" init_global
-t "init troca modelo fora do catalogo" modelos_aplicados
-t "init de novo nao muda nada" idempotente
-t "doctor passa" doctor_ok
+t "init installs and renders paths" init_global
+t "init swaps a model missing from the catalog" modelos_aplicados
+t "init again changes nothing" idempotente
+t "doctor passes" doctor_ok
 
 preserva_modelo() {
-  sed -i.bak 's/^model: .*/model: opencode\/pago/' "$CFG/agents/debate-arch.md"; rm -f "$CFG/agents/debate-arch.md.bak"
+  sed -i.bak 's/^model: .*/model: opencode\/paid/' "$CFG/agents/debate-arch.md"; rm -f "$CFG/agents/debate-arch.md.bak"
   "$CLI" update
-  grep -q '^model: opencode/pago$' "$CFG/agents/debate-arch.md"
+  grep -q '^model: opencode/paid$' "$CFG/agents/debate-arch.md"
 }
 update_repara_rotacao() {
   sed -i.bak 's/^model: .*/model: opencode\/sumiu/' "$CFG/agents/debate-ux.md"; rm -f "$CFG/agents/debate-ux.md.bak"
   "$CLI" update
-  grep -q '^model: opencode/gratis-' "$CFG/agents/debate-ux.md"
-  grep -q '^model: opencode/pago$' "$CFG/agents/debate-arch.md"
+  grep -q '^model: opencode/free-' "$CFG/agents/debate-ux.md"
+  grep -q '^model: opencode/paid$' "$CFG/agents/debate-arch.md"
 }
 perfil_misto() {
-  nao "$CLI" models profile misto opencode/inexistente
-  "$CLI" models profile misto opencode/pago
-  grep -q '^model: opencode/pago$' "$CFG/agents/debate-judge.md"
-  grep -q '^model: opencode/gratis-' "$CFG/agents/debate-scout.md"
-  "$CLI" models check | grep -q '^perfil misto, forte=opencode/pago$'
-  "$CLI" models profile gratis
-  grep -q '^model: opencode/gratis-' "$CFG/agents/debate-judge.md"
+  nao "$CLI" models profile mixed opencode/missing
+  "$CLI" models profile mixed opencode/paid
+  grep -q '^model: opencode/paid$' "$CFG/agents/debate-judge.md"
+  grep -q '^model: opencode/free-' "$CFG/agents/debate-scout.md"
+  "$CLI" models check | grep -q '^profile mixed, strong=opencode/paid$'
+  "$CLI" models profile free
+  grep -q '^model: opencode/free-' "$CFG/agents/debate-judge.md"
 }
 protege_edicao() {
   echo extra >> "$CFG/agents/debate-pm.md"
@@ -117,16 +117,29 @@ force_faz_backup() {
   nao grep -q '^extra$' "$CFG/agents/debate-pm.md"
 }
 preserva_conf() {
-  echo 'debate-judge=meu/modelo-pago' >> "$SK/modelos.conf"
+  echo 'debate-judge=my/paid-model' >> "$SK/models.conf"
   "$CLI" update
-  grep -q '^debate-judge=meu/modelo-pago$' "$SK/modelos.conf"
+  grep -q '^debate-judge=my/paid-model$' "$SK/models.conf"
 }
-t "update preserva modelo escolhido" preserva_modelo
-t "update preserva modelos.conf" preserva_conf
-t "update troca so modelo que saiu do catalogo" update_repara_rotacao
-t "models profile misto e gratis" perfil_misto
-t "update recusa sobrescrever edicao" protege_edicao
-t "update --force faz backup" force_faz_backup
+# A pre-0.5 install kept the profile in modelos.conf with Portuguese keys: update carries it into models.conf.
+migra_conf() {
+  mv "$SK/models.conf" "$SK/modelos.conf"
+  printf 'perfil=misto\nforte=opencode/paid\nreserva=opencode/free-b\n' >> "$SK/modelos.conf"
+  "$CLI" update
+  ausente "$SK/modelos.conf"
+  grep -q '^profile=mixed$' "$SK/models.conf"
+  grep -q '^strong=opencode/paid$' "$SK/models.conf"
+  grep -q '^spare=opencode/free-b$' "$SK/models.conf"
+  grep -q '^debate-judge=my/paid-model$' "$SK/models.conf"
+  sed -i.bak -e 's/^profile=mixed$/profile=free/' -e 's/^strong=.*/strong=/' "$SK/models.conf"; rm -f "$SK/models.conf.bak"
+}
+t "update keeps the chosen model" preserva_modelo
+t "update keeps models.conf" preserva_conf
+t "update migrates a pre-0.5 modelos.conf" migra_conf
+t "update swaps only a model that left the catalog" update_repara_rotacao
+t "models profile mixed and free" perfil_misto
+t "update refuses to overwrite an edit" protege_edicao
+t "update --force makes a backup" force_faz_backup
 
 desinstala() {
   : > "$CFG/agents/build.md"
@@ -137,7 +150,7 @@ desinstala() {
 adota_instalacao_antiga() {
   mkdir -p "$CFG/agents"; echo antigo > "$CFG/agents/debate-arch.md"
   nao "$CLI" init > "$WORK/a" 2>&1
-  grep -q 'nada foi alterado' "$WORK/a"
+  grep -q 'nothing was changed' "$WORK/a"
   [ "$(cat "$CFG/agents/debate-arch.md")" = "antigo" ]
   ausente "$SK"
   "$CLI" init --force
@@ -163,10 +176,10 @@ sem_yaml_duplicado() {
     [ "$(grep -c 'scripts/\*": allow' "$XDG_CONFIG_HOME/opencode/agents/debate.md")" = "1" ]
   )
 }
-t "uninstall remove so o que instalou" desinstala
-t "init recusa instalacao antiga sem --force" adota_instalacao_antiga
-t "--project usa caminho relativo" projeto
-t "config fora do HOME nao duplica chave YAML" sem_yaml_duplicado
+t "uninstall removes only what it installed" desinstala
+t "init refuses an old install without --force" adota_instalacao_antiga
+t "--project uses a relative path" projeto
+t "config outside HOME does not duplicate a YAML key" sem_yaml_duplicado
 
 # --- gates
 novo_caso() {
@@ -181,50 +194,51 @@ brief_reprova() {
   nao "$CLI" validate "$c" --brief
 }
 contraste() {
-  c="$(novo_caso)"; cp "$FX/proposta-ux.md" "$c/proposals/debate-ux.md"
-  "$CLI" gate "$c" proposta debate-ux
-  sed 's/^tinta #16181D/tinta #C8C8C8/' "$FX/proposta-ux.md" > "$c/proposals/debate-ux.md"
-  nao "$CLI" gate "$c" proposta debate-ux > "$WORK/g" 2>&1
-  grep -q 'tinta/papel' "$WORK/g"
-  # Com diretor de arte no painel, o TOKENS e dele: a proposta de UX nao responde pelo contraste.
-  "$CLI" gate "$c" proposta debate-ux debate-brand > "$WORK/g" 2>&1 || true
-  grep -q 'OK proposta proposals/debate-ux.md' "$WORK/g"
+  c="$(novo_caso)"; cp "$FX/proposal-ux.md" "$c/proposals/debate-ux.md"
+  "$CLI" gate "$c" proposal debate-ux
+  sed 's/^ink #16181D/ink #C8C8C8/' "$FX/proposal-ux.md" > "$c/proposals/debate-ux.md"
+  nao "$CLI" gate "$c" proposal debate-ux > "$WORK/g" 2>&1
+  grep -q 'ink/paper' "$WORK/g"
+  # With an art director on the panel, TOKENS is theirs: the UX proposal does not answer for contrast.
+  "$CLI" gate "$c" proposal debate-ux debate-brand > "$WORK/g" 2>&1 || true
+  grep -q 'OK proposal proposals/debate-ux.md' "$WORK/g"
 }
 adr_com_acento() {
   c="$(novo_caso)"
-  sed -e 's/### Opcoes consideradas/### Opções consideradas/' -e 's/### Resultado da decisao/### Resultado da decisão/' \
-      -e 's/### Confirmacao/### Confirmação/' "$FX/decision.md" > "$c/decision.md"
-  "$CLI" gate "$c" decisao
+  sed -e 's/### Considered options/### Considered Options/' -e 's/### Decision outcome/### DECISION OUTCOME/' \
+      -e 's/### Confirmation/### Confirmation and review/' "$FX/decision.md" > "$c/decision.md"
+  "$CLI" gate "$c" decision
   [ "$(ls "$c"/adr/*.md | wc -l | tr -d ' ')" = "3" ]
 }
 backlog_pos_com_acento() {
-  c="$(novo_caso)"; cp "$FX/BACKLOG.md" "$c/BACKLOG.md"
+  c="$(novo_caso)"; sed 's/^## Post-launch/## Post launch/' "$FX/BACKLOG.md" > "$c/BACKLOG.md"
   "$CLI" backlog "$c" > /dev/null
-  [ "$(jq -r '.[-1].fase' "$c/backlog.json")" = "Pos-lancamento" ]
+  [ "$(jq -r '.[-1].phase' "$c/backlog.json")" = "Post-launch" ]
+  [ "$(jq -r '.[0].blocks_phase' "$c/backlog.json")" = "true" ]
 }
 ciclo() {
-  c="$(novo_caso)"; sed 's/dep B15, #lancamento/dep B15 B17, #lancamento/' "$FX/BACKLOG.md" > "$c/BACKLOG.md"
+  c="$(novo_caso)"; sed 's/dep B15, #launch/dep B15 B17, #launch/' "$FX/BACKLOG.md" > "$c/BACKLOG.md"
   nao "$CLI" gate "$c" backlog > "$WORK/g" 2>&1
-  grep -q 'ciclo' "$WORK/g"
+  grep -q 'cycle' "$WORK/g"
 }
-tp "brief vazio reprova" brief_reprova
-tp "gate de contraste aprova e reprova" contraste
-tp "ADR com acento passa e separa" adr_com_acento
-tp "backlog reconhece Pos-lancamento com acento" backlog_pos_com_acento
+tp "empty brief fails" brief_reprova
+tp "contrast gate passes and fails" contraste
+tp "ADR headings in any case pass and split" adr_com_acento
+tp "backlog recognizes Post launch spelled without a hyphen" backlog_pos_com_acento
 chaves_no_titulo() {
   c="$(novo_caso)"
   awk '/^- \[ \] B02 / { sub(/B02 /, "B02 Expor /v1/alerts/{id}/decisoes. ") } { print }' "$FX/BACKLOG.md" > "$c/BACKLOG.md"
   grep -q '{id}' "$c/BACKLOG.md"
   "$CLI" gate "$c" backlog
 }
-tp "backlog reprova ciclo de dependencia" ciclo
-tp "backlog aceita chaves no texto do item" chaves_no_titulo
+tp "backlog fails a dependency cycle" ciclo
+tp "backlog accepts braces in the item text" chaves_no_titulo
 
-# Cada gate novo reprova o que promete reprovar.
+# Every gate fails what it promises to fail.
 caso_completo() {
   c="$(novo_caso)"
   cp "$FX/research.md" "$c/research.md"; cp "$FX/agenda.md" "$c/agenda.md"
-  for a in arch ux pm design brand gcp k8s sec aws data ai mobile; do cp "$FX/proposta-$a.md" "$c/proposals/debate-$a.md"; done
+  for a in arch ux pm design brand gcp k8s sec aws data ai mobile; do cp "$FX/proposal-$a.md" "$c/proposals/debate-$a.md"; done
   printf '%s' "$c"
 }
 reprova() { # reprova <motivo> <gate args...>
@@ -234,190 +248,194 @@ reprova() { # reprova <motivo> <gate args...>
 }
 citacao_inventada() {
   c="$(caso_completo)"
-  sed -e 's/debate-gcp/debate-k8s/g' "$FX/ataque.md" > "$c/critiques/debate-arch.md"
-  "$CLI" gate "$c" ataque debate-arch
-  sed -e 's/debate-gcp/debate-k8s/g' -e 's/opcao A porque custa menos/frase que ninguem escreveu/' "$FX/ataque.md" > "$c/critiques/debate-arch.md"
-  reprova 'trecho nao existe' "$c" ataque debate-arch
+  sed -e 's/debate-gcp/debate-k8s/g' "$FX/critique.md" > "$c/critiques/debate-arch.md"
+  "$CLI" gate "$c" critique debate-arch
+  sed -e 's/debate-gcp/debate-k8s/g' -e 's/option A because it costs less/a sentence nobody wrote/' "$FX/critique.md" > "$c/critiques/debate-arch.md"
+  reprova 'excerpt not found' "$c" critique debate-arch
 }
 citacao_folgada() {
   c="$(caso_completo)"
-  sed -e 's/debate-gcp/debate-k8s/g' -e 's/"D1: opcao A porque custa menos"/"  d1:   **OPCAO A** ... custa menos"/' "$FX/ataque.md" > "$c/critiques/debate-arch.md"
-  "$CLI" gate "$c" ataque debate-arch
+  sed -e 's/debate-gcp/debate-k8s/g' -e 's/"D1: option A because it costs less"/"  d1:   **OPTION A** ... costs less"/' "$FX/critique.md" > "$c/critiques/debate-arch.md"
+  "$CLI" gate "$c" critique debate-arch
 }
 veto_contra_si() {
   c="$(caso_completo)"
-  sed 's/debate-gcp/debate-arch/g' "$FX/ataque.md" > "$c/critiques/debate-arch.md"
-  reprova 'contra si mesmo' "$c" ataque debate-arch
+  sed 's/debate-gcp/debate-arch/g' "$FX/critique.md" > "$c/critiques/debate-arch.md"
+  reprova 'against itself' "$c" critique debate-arch
 }
 id_inexistente() {
   c="$(caso_completo)"
-  echo 'Preco em R99.' >> "$c/proposals/debate-gcp.md"
-  reprova 'id inexistente em research.md: R99' "$c" proposta debate-gcp
+  echo 'Price in R99.' >> "$c/proposals/debate-gcp.md"
+  reprova 'id missing from research.md: R99' "$c" proposal debate-gcp
 }
 proposta_sem_agenda() {
   c="$(caso_completo)"
-  sed '/^D2:/d' "$FX/proposta-gcp.md" > "$c/proposals/debate-gcp.md"
-  reprova 'sem posicao em D2' "$c" proposta debate-gcp
+  sed '/^D2:/d' "$FX/proposal-gcp.md" > "$c/proposals/debate-gcp.md"
+  reprova 'no position on D2' "$c" proposal debate-gcp
 }
 agenda_dono_fora() {
   c="$(caso_completo)"
   sed 's/debate-ux/debate-mobile/' "$FX/agenda.md" > "$c/agenda.md"
-  reprova 'dono fora do painel' "$c" agenda
+  reprova 'owner outside the panel' "$c" agenda
 }
 decisao_caso() { c="$(caso_completo)"; printf '%s' "$c"; }
 pesos_errados() {
-  c="$(decisao_caso)"; sed 's/velocidade=40/velocidade=50/' "$FX/decision.md" > "$c/decision.md"
-  reprova 'pesos somam 110' "$c" decisao
+  c="$(decisao_caso)"; sed 's/speed=40/speed=50/' "$FX/decision.md" > "$c/decision.md"
+  reprova 'weights sum 110' "$c" decision
 }
 placar_errado() {
   c="$(decisao_caso)"; sed 's/| 430 |/| 500 |/' "$FX/decision.md" > "$c/decision.md"
-  reprova 'Total de Monolito' "$c" decisao
+  reprova 'Total of Monolith' "$c" decision
 }
 dn_sem_decisao() {
   c="$(decisao_caso)"; sed -e '/^### D3/d' "$FX/decision.md" > "$c/decision.md"
-  reprova 'D3 da agenda sem decisao' "$c" decisao
+  reprova 'agenda D3 without a decision' "$c" decision
 }
 veto_ignorado() {
   c="$(decisao_caso)"; cp "$FX/decision.md" "$c/decision.md"
-  for i in 1 2 3 4 5 6 7 8 9 10; do sed 's/debate-gcp/debate-k8s/' "$FX/ataque.md" > "$c/critiques/x$i.md"; done
-  reprova 'veto(s) julgado(s) de 10' "$c" decisao
+  for i in 1 2 3 4 5 6 7 8 9 10; do sed 's/debate-gcp/debate-k8s/' "$FX/critique.md" > "$c/critiques/x$i.md"; done
+  reprova 'veto(es) ruled out of 10' "$c" decision
 }
 errado_ignorado() {
   c="$(decisao_caso)"; cp "$FX/decision.md" "$c/decision.md"
-  sed 's/confirmado/errado/' "$FX/research-check.md" > "$c/research-check.md"
-  reprova 'errado(s) zerado(s) de 1' "$c" decisao
+  sed 's/confirmed/wrong/' "$FX/research-check.md" > "$c/research-check.md"
+  reprova 'wrong claim(s) zeroed out of 1' "$c" decision
 }
 tokens_divergem() {
   c="$(decisao_caso)"; cp "$FX/SDD.md" "$c/SDD.md"
-  { cat "$FX/decision.md"; printf '\n```\n'; sed -n '/^TOKENS/,/^FIM/p' "$FX/SDD.md" | sed 's/^acento #[0-9A-Fa-f]*/acento #123456/'; printf '```\n'; } > "$c/decision.md"
-  reprova 'difere do bloco de decision.md' "$c" sdd
+  { cat "$FX/decision.md"; printf '\n```\n'; sed -n '/^TOKENS/,/^END/p' "$FX/SDD.md" | sed 's/^accent #[0-9A-Fa-f]*/accent #123456/'; printf '```\n'; } > "$c/decision.md"
+  reprova 'differ from the decision.md block' "$c" sdd
 }
 adr_fora_do_sdd() {
   c="$(decisao_caso)"; cp "$FX/SDD.md" "$c/SDD.md"; mkdir -p "$c/adr"; : > "$c/adr/0099-x.md"
-  reprova 'ADR-0099 fora do SDD' "$c" sdd
+  reprova 'ADR-0099 missing from the SDD' "$c" sdd
 }
 banido_na_proposta() {
-  c="$(caso_completo)"; echo 'Fundo com glassmorphism.' >> "$c/proposals/debate-design.md"
-  reprova 'visual banido' "$c" proposta debate-design
+  c="$(caso_completo)"; echo 'Background with glassmorphism.' >> "$c/proposals/debate-design.md"
+  reprova 'banned visual' "$c" proposal debate-design
 }
-# Cada assento tem o seu gate de papel: a fixture passa e tirar a palavra-chave reprova.
+# Every seat has its role gate: the fixture passes and removing the keyword fails it.
 gate_por_papel() {
   c="$(caso_completo)"
-  for a in arch ux pm design brand gcp k8s sec aws data ai mobile; do "$CLI" gate "$c" proposta "debate-$a"; done
-  for x in 'pm:metrica:sem metrica' 'design:inventario:sem inventario' 'brand:logo:sem logo' 'aws:iam:sem IAM' \
-           'data:pipeline:sem pipeline' 'ai:eval:sem eval' 'mobile:offline:sem offline' 'ux:wcag:sem plano WCAG'; do
+  for a in arch ux pm design brand gcp k8s sec aws data ai mobile; do "$CLI" gate "$c" proposal "debate-$a"; done
+  for x in 'pm:metric:no metric' 'design:inventory:no screen inventory' 'brand:logo:no logo' 'aws:iam:no IAM' \
+           'data:pipeline:no pipeline' 'ai:eval:no eval' 'mobile:offline:no offline' 'ux:wcag:no WCAG plan'; do
     a="${x%%:*}"; r="${x#*:}"; p="${r%%:*}"; mot="${r#*:}"
-    grep -iv -- "$p" "$FX/proposta-$a.md" > "$c/proposals/debate-$a.md"
-    reprova "$mot" "$c" proposta "debate-$a"
-    cp "$FX/proposta-$a.md" "$c/proposals/debate-$a.md"
+    grep -iv -- "$p" "$FX/proposal-$a.md" > "$c/proposals/debate-$a.md"
+    reprova "$mot" "$c" proposal "debate-$a"
+    cp "$FX/proposal-$a.md" "$c/proposals/debate-$a.md"
   done
 }
 revisao_do_designer() {
   c="$(caso_completo)"; rm -f "$c/agenda.md"
-  sed 's/debate-gcp/debate-ux/g' "$FX/ataque.md" > "$c/critiques/debate-design.md"
-  sed 's/debate-gcp/debate-ux/g' "$FX/ataque.md" > "$c/critiques/debate-arch.md"
-  sed 's/debate-gcp/debate-design/g' "$FX/ataque-ux.md" > "$c/critiques/debate-ux.md"
-  "$CLI" gate "$c" ataque debate-ux debate-design
-  sed 's/debate-gcp/debate-design/g' "$FX/ataque.md" > "$c/critiques/debate-ux.md"
-  reprova 'Revisao debate-design' "$c" ataque debate-ux debate-design
-  "$CLI" gate "$c" ataque debate-ux debate-arch
+  sed 's/debate-gcp/debate-ux/g' "$FX/critique.md" > "$c/critiques/debate-design.md"
+  sed 's/debate-gcp/debate-ux/g' "$FX/critique.md" > "$c/critiques/debate-arch.md"
+  sed 's/debate-gcp/debate-design/g' "$FX/critique-ux.md" > "$c/critiques/debate-ux.md"
+  "$CLI" gate "$c" critique debate-ux debate-design
+  sed 's/debate-gcp/debate-design/g' "$FX/critique.md" > "$c/critiques/debate-ux.md"
+  reprova 'Review debate-design' "$c" critique debate-ux debate-design
+  "$CLI" gate "$c" critique debate-ux debate-arch
 }
 brandbook_gate() {
   c="$(decisao_caso)"; cp "$FX/SDD.md" "$c/SDD.md"; cp "$FX/BRANDBOOK.md" "$c/BRANDBOOK.md"
-  "$CLI" gate "$c" marca
-  sed 's/^acento #[0-9A-Fa-f]*/acento #0A4FEE/' "$FX/BRANDBOOK.md" > "$c/BRANDBOOK.md"
-  reprova 'TOKENS do BRANDBOOK difere do SDD' "$c" marca
-  sed '/^| fila /d' "$FX/BRANDBOOK.md" > "$c/BRANDBOOK.md"
-  reprova 'secao 7 sem tela adaptada' "$c" marca
+  "$CLI" gate "$c" brand
+  sed 's/^accent #[0-9A-Fa-f]*/accent #0A4FEE/' "$FX/BRANDBOOK.md" > "$c/BRANDBOOK.md"
+  reprova 'BRANDBOOK TOKENS differ from the SDD' "$c" brand
+  sed '/^| queue /d' "$FX/BRANDBOOK.md" > "$c/BRANDBOOK.md"
+  reprova 'section 7 without an adapted screen' "$c" brand
 }
+# The brief answers may be in any language: Portuguese values trigger the same seats as English ones.
 brief_escolhe_painel() {
   cd "$WORK"; rm -rf "$WORK/cases"
-  c="$("$CLI" new "App de agendamento para clinicas" cases)"
+  c="$("$CLI" new "App de agendamento para clínicas" cases)"
+  case "$c" in */app-de-agendamento-para-clinicas) ;; *) echo "slug kept the accent: $c"; return 1 ;; esac
   sed -i.bak -e 's/^\(- [^:]*:\)[[:space:]]*$/\1 preenchido/' \
-    -e 's/^- Dados sensiveis\([^:]*\):.*/- Dados sensiveis\1: LGPD, dados de saúde/' \
-    -e 's/^- Plataforma\([^:]*\):.*/- Plataforma\1: aplicativo iOS e Android na AWS/' \
-    -e 's/^- Fora do escopo:.*/- Fora do escopo: IA e kubernetes/' "$c/brief.md"; rm -f "$c/brief.md.bak"
-  "$CLI" painel "$c" > "$WORK/p"
-  grep -q '^painel: debate-arch debate-ux debate-pm debate-design debate-sec debate-mobile debate-aws$' "$WORK/p"
-  grep -q 'debate-sec: brief diz "lgpd"' "$WORK/p"
+    -e 's/^- Sensitive data\([^:]*\):.*/- Sensitive data\1: LGPD, dados de saúde/' \
+    -e 's/^- Platform\([^:]*\):.*/- Platform\1: aplicativo iOS e Android na AWS/' \
+    -e 's/^- Out of scope:.*/- Out of scope: IA e kubernetes/' "$c/brief.md"; rm -f "$c/brief.md.bak"
+  "$CLI" panel "$c" > "$WORK/p"
+  grep -q '^panel: debate-arch debate-ux debate-pm debate-design debate-sec debate-mobile debate-aws$' "$WORK/p"
+  grep -q 'debate-sec: brief says "lgpd"' "$WORK/p"
   nao grep -q 'debate-ai\|debate-k8s\|debate-gcp' "$WORK/p"
-  nao grep -q '^painel:' "$c/meta.txt"
-  "$CLI" painel "$c" --grava brand
-  grep -q '^painel: debate-arch debate-ux debate-pm debate-brand$' "$c/meta.txt"
-  sed -i.bak 's/^- Dados sensiveis\([^:]*\):.*/- Dados sensiveis\1: nenhum dado pessoal/' "$c/brief.md"; rm -f "$c/brief.md.bak"
-  "$CLI" painel "$c" | grep -q '^painel: debate-arch debate-ux debate-pm debate-design debate-mobile debate-aws$'
+  nao grep -q '^panel:' "$c/meta.txt"
+  "$CLI" panel "$c" --save brand
+  grep -q '^panel: debate-arch debate-ux debate-pm debate-brand$' "$c/meta.txt"
+  sed -i.bak 's/^- Sensitive data\([^:]*\):.*/- Sensitive data\1: nenhum dado pessoal/' "$c/brief.md"; rm -f "$c/brief.md.bak"
+  "$CLI" panel "$c" | grep -q '^panel: debate-arch debate-ux debate-pm debate-design debate-mobile debate-aws$'
+  sed -i.bak 's/^- Sensitive data\([^:]*\):.*/- Sensitive data\1: health records under HIPAA/' "$c/brief.md"; rm -f "$c/brief.md.bak"
+  "$CLI" panel "$c" | grep -q 'debate-sec: brief says "health"'
 }
-tp "gate de papel em cada assento" gate_por_papel
-tp "UX revisa o designer no ataque" revisao_do_designer
-tp "brandbook com TOKENS do SDD e tela adaptada" brandbook_gate
-tp "brief escolhe o painel, base sempre" brief_escolhe_painel
+tp "role gate on every seat" gate_por_papel
+tp "UX reviews the designer in the critique" revisao_do_designer
+tp "brandbook with SDD TOKENS and an adapted screen" brandbook_gate
+tp "brief picks the panel in any language, base always" brief_escolhe_painel
 saida_gigante() {
   c="$(caso_completo)"; i=0; while [ "$i" -lt 90 ]; do echo "linha $i" >> "$c/proposals/debate-gcp.md"; i=$((i + 1)); done
-  reprova 'teto 55' "$c" proposta debate-gcp
+  reprova 'cap 55' "$c" proposal debate-gcp
 }
 conta_capacidade() {
-  c="$(novo_caso)"; sed 's/= 56 dias/= 90 dias/' "$FX/BACKLOG.md" > "$c/BACKLOG.md"
-  reprova 'a conta da 56' "$c" backlog
+  c="$(novo_caso)"; sed 's/= 56 working days/= 90 working days/' "$FX/BACKLOG.md" > "$c/BACKLOG.md"
+  reprova 'the arithmetic gives 56' "$c" backlog
 }
 plano_nao_cabe() {
-  c="$(novo_caso)"; sed 's/2 x 8 x 5 x 0.7 = 56 dias/1 x 1 x 5 x 0.7 = 3.5 dias/' "$FX/BACKLOG.md" > "$c/BACKLOG.md"
-  reprova 'capacidade e 3.5' "$c" backlog
+  c="$(novo_caso)"; sed 's/2 x 8 x 5 x 0.7 = 56 working days/1 x 1 x 5 x 0.7 = 3.5 working days/' "$FX/BACKLOG.md" > "$c/BACKLOG.md"
+  reprova 'capacity is 3.5' "$c" backlog
 }
 soma_escrita_errada() {
-  c="$(novo_caso)"; sed 's/backlog soma 29/backlog soma 10/' "$FX/BACKLOG.md" > "$c/BACKLOG.md"
-  reprova 'os itens somam 29' "$c" backlog
+  c="$(novo_caso)"; sed 's/backlog sums 29/backlog sums 10/' "$FX/BACKLOG.md" > "$c/BACKLOG.md"
+  reprova 'the items sum 29' "$c" backlog
 }
 tarefa_sem_item() {
   c="$(novo_caso)"; cp "$FX/BACKLOG.md" "$c/BACKLOG.md"
-  "$CLI" specs "$c" ingestao > /dev/null
-  { cat "$FX/tasks.md"; echo '- [ ] T002 [US1] outra'; echo '- [ ] T003 [US1] mais'; } > "$c/specs/01-ingestao/tasks.md"
+  "$CLI" specs "$c" ingestion > /dev/null
+  { cat "$FX/tasks.md"; echo '- [ ] T002 [US1] another'; echo '- [ ] T003 [US1] more'; } > "$c/specs/01-ingestion/tasks.md"
   reprova 'T002' "$c" backlog
   sed 's/spec 01:T001/spec 01:T001-T003/' "$FX/BACKLOG.md" > "$c/BACKLOG.md"
   "$CLI" gate "$c" backlog
 }
 spec_ruim() {
-  c="$(novo_caso)"; "$CLI" specs "$c" ingestao > /dev/null
-  d="$c/specs/01-ingestao"; cp "$FX/spec.md" "$FX/plan.md" "$FX/tasks.md" "$d"
+  c="$(novo_caso)"; "$CLI" specs "$c" ingestion > /dev/null
+  d="$c/specs/01-ingestion"; cp "$FX/spec.md" "$FX/plan.md" "$FX/tasks.md" "$d"
   mkdir -p "$c/adr"; : > "$c/adr/0001-x.md"
   sed 's/ADR-0001/ADR-0042/' "$FX/spec.md" > "$d/spec.md"
   nao "$CLI" validate "$c" > "$WORK/g" 2>&1
-  grep -q 'ADR-0042, que nao existe' "$WORK/g"
+  grep -q 'ADR-0042, which does not exist' "$WORK/g"
   cp "$FX/spec.md" "$d/spec.md"; sed 's/\[US1\] //' "$FX/tasks.md" > "$d/tasks.md"
   nao "$CLI" validate "$c" > "$WORK/g" 2>&1
-  grep -q 'US1 sem task' "$WORK/g"
+  grep -q 'US1 has no task' "$WORK/g"
 }
-tp "ataque com citacao inventada reprova" citacao_inventada
-tp "citacao aceita caixa, espacos e reticencias" citacao_folgada
-tp "veto contra si mesmo reprova" veto_contra_si
-tp "id Rn inexistente reprova" id_inexistente
-tp "proposta sem posicao na agenda reprova" proposta_sem_agenda
-tp "agenda com dono fora do painel reprova" agenda_dono_fora
-tp "pesos fora de 100 reprovam" pesos_errados
-tp "placar com conta errada reprova" placar_errado
-tp "Dn sem decisao reprova" dn_sem_decisao
-tp "veto nao julgado reprova" veto_ignorado
-tp "claim errado nao zerado reprova" errado_ignorado
-tp "TOKENS do SDD diferente de decision.md reprova" tokens_divergem
-tp "ADR fora do SDD reprova" adr_fora_do_sdd
-tp "visual banido reprova na proposta" banido_na_proposta
-tp "saida muito acima do teto reprova" saida_gigante
-tp "conta de capacidade errada reprova" conta_capacidade
-tp "plano acima da capacidade reprova" plano_nao_cabe
-tp "soma escrita diferente dos itens reprova" soma_escrita_errada
-tp "task sem item reprova, intervalo cobre" tarefa_sem_item
-tp "spec com ADR inexistente ou US sem task reprova" spec_ruim
+tp "critique with an invented quote fails" citacao_inventada
+tp "quote tolerates case, spaces and ellipses" citacao_folgada
+tp "veto against itself fails" veto_contra_si
+tp "missing Rn id fails" id_inexistente
+tp "proposal without an agenda position fails" proposta_sem_agenda
+tp "agenda with an owner outside the panel fails" agenda_dono_fora
+tp "weights not summing 100 fail" pesos_errados
+tp "score table with wrong arithmetic fails" placar_errado
+tp "Dn without a decision fails" dn_sem_decisao
+tp "unruled veto fails" veto_ignorado
+tp "wrong claim not zeroed fails" errado_ignorado
+tp "SDD TOKENS different from decision.md fail" tokens_divergem
+tp "ADR missing from the SDD fails" adr_fora_do_sdd
+tp "banned visual fails the proposal" banido_na_proposta
+tp "output far over the cap fails" saida_gigante
+tp "wrong capacity arithmetic fails" conta_capacidade
+tp "plan over capacity fails" plano_nao_cabe
+tp "written sum different from the items fails" soma_escrita_errada
+tp "task without an item fails, a range covers it" tarefa_sem_item
+tp "spec with a missing ADR or a US without a task fails" spec_ruim
 
-# --- protocolo inteiro com opencode stub
+# --- the whole protocol with the opencode stub
 e2e() {
   c="$(novo_caso)"
   SPECS=0 MODEL=stub/modelo "$CLI" run "$c" 3
   for f in research.md agenda.md proposals/debate-arch.md proposals/debate-ux.md critiques/debate-pm.md research-check.md decision.md \
-           adr/0001-usar-monolito-modular.md SDD.md auditoria.md style-tile.html tokens.json tokens.css raw/metricas.tsv; do
-    [ -s "$c/$f" ] || { echo "faltou $f"; return 1; }
+           adr/0001-use-a-modular-monolith.md SDD.md audit.md style-tile.html tokens.json tokens.css raw/metrics.tsv; do
+    [ -s "$c/$f" ] || { echo "missing $f"; return 1; }
   done
   ausente "$c/BACKLOG.md"
-  jq -e '.color.papel["$value"].hex == "#F2EFE8" and .motion.easing["$value"] == [0.2,0.8,0.2,1]' "$c/tokens.json"
-  "$CLI" specs "$c" ingestao triagem relatorio
+  jq -e '.color.paper["$value"].hex == "#F2EFE8" and .motion.easing["$value"] == [0.2,0.8,0.2,1]' "$c/tokens.json"
+  "$CLI" specs "$c" ingestion triage report
   for d in "$c"/specs/*/; do cp "$FX/spec.md" "$FX/plan.md" "$FX/tasks.md" "$d"; done
   [ "$(ls "$c"/checklists/ | wc -l | tr -d ' ')" = "3" ]
   SPECS=0 MODEL=stub/modelo "$CLI" run "$c" 3
@@ -432,12 +450,12 @@ retoma() {
   SPECS=0 MODEL=stub/modelo "$CLI" run "$c" 1
   log="$WORK/retoma.log"; : > "$log"
   SPECS=0 STUB_LOG="$log" MODEL=stub/modelo "$CLI" run "$c" 1
-  nao grep -q 'fase proposta' "$log"
+  nao grep -q 'phase proposal' "$log"
 }
 reparo() {
   c="$(novo_caso)"; rm -f "$STUB_STATE".*
   SPECS=0 FAIL_ONCE=decision.md MODEL=stub/modelo "$CLI" run "$c" 1
-  grep -q 'gate decisao ok apos reparo' "$c/raw/summary.log"
+  grep -q 'gate decision ok after repair' "$c/raw/summary.log"
 }
 sem_instalar() {
   export HOME="$WORK/home-vazio" XDG_CONFIG_HOME="$WORK/home-vazio/.config"; mkdir -p "$HOME"
@@ -448,33 +466,33 @@ sem_instalar() {
 replica_so_de_vetado() {
   c="$(novo_caso)"
   SPECS=0 MODEL=stub/modelo "$CLI" run "$c" 3
-  # O stub sempre mira o 1o rival: arch veta ux e os demais vetam arch; pm nao leva veto.
-  grep -q '^painel: debate-arch debate-ux debate-pm$' "$c/meta.txt"
+  # The stub always targets the 1st rival: arch vetoes ux and the rest veto arch; pm takes no veto.
+  grep -q '^panel: debate-arch debate-ux debate-pm$' "$c/meta.txt"
   existe "$c/proposals/debate-arch-r2.md" "$c/proposals/debate-ux-r2.md"
   ausente "$c/proposals/debate-pm-r2.md"
 }
 auditoria_corrige() {
   c="$(novo_caso)"
   log="$WORK/aud.log"; : > "$log"
-  STUB_LOG="$log" STUB_AUDITORIA=auditoria-corrigir.md SPECS=0 MODEL=stub/modelo "$CLI" run "$c" 1
-  grep -q 'fase correcao' "$log"
-  grep -q '^Veredito: APLICADO' "$c/auditoria.md"
+  STUB_LOG="$log" STUB_AUDIT=audit-fix.md SPECS=0 MODEL=stub/modelo "$CLI" run "$c" 1
+  grep -q 'phase fix' "$log"
+  grep -q '^Verdict: APPLIED' "$c/audit.md"
   : > "$log"
-  STUB_LOG="$log" STUB_AUDITORIA=auditoria-corrigir.md SPECS=0 MODEL=stub/modelo "$CLI" run "$c" 1
-  nao grep -q 'fase correcao' "$log"
+  STUB_LOG="$log" STUB_AUDIT=audit-fix.md SPECS=0 MODEL=stub/modelo "$CLI" run "$c" 1
+  nao grep -q 'phase fix' "$log"
 }
 auditoria_aprova_sem_reemitir() {
   c="$(novo_caso)"
   log="$WORK/aud.log"; : > "$log"
   STUB_LOG="$log" SPECS=0 MODEL=stub/modelo "$CLI" run "$c" 1
-  grep -q 'fase auditoria' "$log"
-  nao grep -q 'fase correcao' "$log"
+  grep -q 'phase audit' "$log"
+  nao grep -q 'phase fix' "$log"
 }
 agenda_pulada_em_caso_antigo() {
   c="$(novo_caso)"
-  for a in arch ux pm; do sed '/^D[0-9]:/d' "$FX/proposta-$a.md" > "$c/proposals/debate-$a.md"; done
+  for a in arch ux pm; do sed '/^D[0-9]:/d' "$FX/proposal-$a.md" > "$c/proposals/debate-$a.md"; done
   SPECS=0 MODEL=stub/modelo "$CLI" run "$c" 1
-  grep -q '^pulado' "$c/agenda.md"
+  grep -q '^skipped' "$c/agenda.md"
 }
 tarefa_pede_texto() {
   c="$(novo_caso)"
@@ -482,68 +500,69 @@ tarefa_pede_texto() {
   STUB_LOG="$log" SPECS=0 REVIEW=0 MODEL=stub/modelo "$CLI" run "$c" 1
   n="$(wc -l < "$log" | tr -d ' ')"
   [ "$n" -ge 5 ]
-  [ "$(grep -c 'nao grava arquivo' "$log")" = "$n" ]
+  [ "$(grep -c 'do not write files' "$log")" = "$n" ]
+  [ "$(grep -c 'Write it in English' "$log")" = "$n" ]
 }
 assumido_citado() {
   c="$(novo_caso)"
-  echo 'Meta: premissas `[assumido]` validadas.' >> "$c/idea.md"
+  echo 'Goal: `[assumed]` premises validated.' >> "$c/idea.md"
   "$CLI" validate "$c" --brief
-  grep -q 'assumido' "$c/idea.md"
+  grep -q 'assumed' "$c/idea.md"
   cp "$FX/research.md" "$c/research.md"
   nao "$CLI" validate "$c" > "$WORK/g" 2>&1
-  nao grep -q 'assumido-sem-dono' "$WORK/g"
-  echo 'Prazo [assumido] sem responsavel.' >> "$c/idea.md"
+  nao grep -q 'assumed-without-owner' "$WORK/g"
+  echo 'Deadline [assumed] with nobody responsible.' >> "$c/idea.md"
   nao "$CLI" validate "$c" > "$WORK/g" 2>&1
-  grep -q 'assumido-sem-dono' "$WORK/g"
+  grep -q 'assumed-without-owner' "$WORK/g"
 }
 retoma_status() {
   c="$(novo_caso)"
-  "$CLI" status "$c" | grep -q '^proxima: pesquisa$'
+  "$CLI" status "$c" | grep -q '^next: research$'
   SPECS=0 MODEL=stub/modelo "$CLI" run "$c" 1
   "$CLI" status "$c" > "$WORK/s"
-  grep -q '^decisao *ok' "$WORK/s"
-  grep -q '^proxima: specs$' "$WORK/s"
-  grep -q '^custo: ' "$WORK/s"
+  grep -q '^decision *ok' "$WORK/s"
+  grep -q '^next: specs$' "$WORK/s"
+  grep -q '^cost: ' "$WORK/s"
 }
 defasagem() {
   c="$(novo_caso)"
   SPECS=0 MODEL=stub/modelo "$CLI" run "$c" 1
   touch -t 203001010000 "$c/brief.md"
-  "$CLI" status "$c" | grep -q 'brief.md mais novo que research.md'
+  "$CLI" status "$c" | grep -q 'brief.md newer than research.md'
   SPECS=0 MODEL=stub/modelo "$CLI" run "$c" 1 > "$WORK/x"
-  grep -q 'aviso: brief.md mais novo' "$WORK/x"
+  grep -q 'warning: brief.md newer' "$WORK/x"
 }
 from_arquiva() {
   c="$(novo_caso)"
   SPECS=0 MODEL=stub/modelo "$CLI" run "$c" 3
   log="$WORK/from.log"; : > "$log"
-  FROM=ataque STUB_LOG="$log" SPECS=0 MODEL=stub/modelo "$CLI" run "$c" 3
-  ls "$c"/raw/arquivo/*/critiques/debate-arch.md
-  ls "$c"/raw/arquivo/*/decision.md
-  nao grep -q 'fase proposta' "$log"
-  grep -q 'fase ataque' "$log"
+  FROM=critique STUB_LOG="$log" SPECS=0 MODEL=stub/modelo "$CLI" run "$c" 3
+  ls "$c"/raw/archive/*/critiques/debate-arch.md
+  ls "$c"/raw/archive/*/decision.md
+  nao grep -q 'phase proposal' "$log"
+  grep -q 'phase critique' "$log"
   [ -s "$c/decision.md" ]
 }
-from_invalido() { c="$(novo_caso)"; nao "$CLI" run "$c" --from nada > "$WORK/x" 2>&1; grep -q 'from invalido' "$WORK/x"; }
+from_invalido() { c="$(novo_caso)"; nao "$CLI" run "$c" --from nada > "$WORK/x" 2>&1; grep -q 'invalid --from' "$WORK/x"; }
 sala_cega() {
   c="$(novo_caso)"; cp "$FX/research.md" "$c/research.md"
   cat > "$WORK/espia" <<ESPIA
 #!/bin/sh
-case "\$PROMPT" in *"fase proposta"*|*"fase ataque"*) ;; *) exec $ROOT/test/stub/harness pi "\$PROMPT" ;; esac
+case "\$PROMPT" in *"phase proposal"*|*"phase critique"*) ;; *) exec $ROOT/test/stub/harness pi "\$PROMPT" ;; esac
 { echo "== \$PWD"; find . -type f | sort; } >> $WORK/espia.log
 sleep 1
 exec $ROOT/test/stub/harness pi "\$PROMPT"
 ESPIA
   : > "$WORK/espia.log"
   HARNESS=custom HARNESS_CMD="exec sh $WORK/espia" SPECS=0 "$CLI" run "$c" --rounds 2
-  grep -q 'raw/salas/proposta-arch' "$WORK/espia.log"
-  awk '/^== .*salas\/proposta/ { f = 1; next } /^== / { f = 0 } f' "$WORK/espia.log" > "$WORK/p.txt"
+  grep -q 'raw/rooms/proposal-arch' "$WORK/espia.log"
+  awk '/^== .*rooms\/proposal/ { f = 1; next } /^== / { f = 0 } f' "$WORK/espia.log" > "$WORK/p.txt"
   grep -q 'brief.md' "$WORK/p.txt"
   nao grep -q 'proposals/\|critiques/' "$WORK/p.txt"
-  awk '/^== .*salas\/ataque-arch/ { f = 1; next } /^== / { f = 0 } f' "$WORK/espia.log" > "$WORK/a.txt"
+  awk '/^== .*rooms\/critique-arch/ { f = 1; next } /^== / { f = 0 } f' "$WORK/espia.log" > "$WORK/a.txt"
   grep -q 'proposals/debate-ux.md' "$WORK/a.txt"
   nao grep -q 'proposals/debate-arch.md\|critiques/' "$WORK/a.txt"
-  ausente "$c/raw/salas" "$c/raw/.lock"
+  ausente "$c/raw/rooms" "$c/raw/.lock"
 }
 limite_espera() {
   c="$(novo_caso)"
@@ -553,7 +572,7 @@ if [ ! -e $WORK/lim.foi ]; then : > $WORK/lim.foi; echo 'HTTP 429 too many reque
 exec $ROOT/test/stub/harness pi "\$PROMPT"
 LIM
   HARNESS=custom HARNESS_CMD="exec sh $WORK/lim" BACKOFF=1 SPECS=0 "$CLI" run "$c" --rounds 1
-  grep -q 'limite em debate-research' "$c/raw/summary.log"
+  grep -q 'rate limit in debate-research' "$c/raw/summary.log"
   [ -s "$c/decision.md" ]
 }
 auth_nao_repete() {
@@ -566,7 +585,7 @@ AUT
   : > "$WORK/aut.n"
   nao env HARNESS=custom HARNESS_CMD="exec sh $WORK/aut" RETRIES=3 SPECS=0 "$CLI" run "$c" --rounds 1 > "$WORK/x" 2>&1
   [ "$(wc -l < "$WORK/aut.n" | tr -d ' ')" = "1" ]
-  grep -q 'auth ou cota' "$c/raw/summary.log"
+  grep -q 'auth or quota' "$c/raw/summary.log"
 }
 paralelo_limita() {
   c="$(novo_caso)"; cp "$FX/research.md" "$c/research.md"
@@ -579,20 +598,20 @@ rm -f $WORK/par.d/\$\$
 exec $ROOT/test/stub/harness pi "\$PROMPT"
 PAR
   : > "$WORK/par.log"
-  HARNESS=custom HARNESS_CMD="exec sh $WORK/par" PARALELO=2 SPECS=0 REVIEW=0 "$CLI" run "$c" --rounds 1
+  HARNESS=custom HARNESS_CMD="exec sh $WORK/par" PARALLEL=2 SPECS=0 REVIEW=0 "$CLI" run "$c" --rounds 1
   [ "$(sort -n "$WORK/par.log" | tail -1)" = "2" ]
 }
 teto_chamadas() {
   c="$(novo_caso)"
-  nao env MAX_CHAMADAS=3 SPECS=0 MODEL=stub/modelo "$CLI" run "$c" 1 > "$WORK/x" 2>&1
-  grep -q 'teto de MAX_CHAMADAS=3' "$c/raw/summary.log"
+  nao env MAX_CALLS=3 SPECS=0 MODEL=stub/modelo "$CLI" run "$c" 1 > "$WORK/x" 2>&1
+  grep -q 'MAX_CALLS=3 cap' "$c/raw/summary.log"
 }
 lock_recusa() {
   c="$(novo_caso)"
   mkdir -p "$c/raw/.lock"; sleep 30 & p=$!
   echo "$p" > "$c/raw/.lock/pid"
   nao env SPECS=0 MODEL=stub/modelo "$CLI" run "$c" 1 > "$WORK/x" 2>&1
-  grep -q 'caso em execucao' "$WORK/x"
+  grep -q 'case already running' "$WORK/x"
   kill "$p"
   wait "$p" || true
   SPECS=0 MODEL=stub/modelo "$CLI" run "$c" 1
@@ -613,48 +632,48 @@ painel_com_sec() {
   (
     export PATH="$FAKE:$PATH"
     c="$(novo_caso)"
-    SPECS=0 REVIEW=0 "$CLI" run "$c" --harness pi --painel arch,design,sec --rounds 2
+    SPECS=0 REVIEW=0 "$CLI" run "$c" --harness pi --panel arch,design,sec --rounds 2
     [ -s "$c/proposals/debate-sec.md" ]
   )
 }
-painel_invalido() { c="$(novo_caso)"; nao "$CLI" run "$c" --painel arch,azure > "$WORK/x" 2>&1; grep -q 'persona inexistente' "$WORK/x"; }
-# Painel com designer e diretor de arte: UX revisa as telas, a marca fecha o brandbook e entra no backlog.
+painel_invalido() { c="$(novo_caso)"; nao "$CLI" run "$c" --panel arch,azure > "$WORK/x" 2>&1; grep -q 'unknown persona' "$WORK/x"; }
+# Panel with a designer and an art director: UX reviews the screens, the brand closes the brandbook and enters the backlog.
 painel_de_marca() {
   (
     export PATH="$FAKE:$PATH"
     c="$(novo_caso)"
-    REVIEW=0 "$CLI" run "$c" --harness pi --painel design,brand --rounds 2 > "$WORK/x" 2>&1
-    grep -q '^painel: debate-arch debate-ux debate-pm debate-design debate-brand$' "$c/meta.txt"
-    grep -q 'assento base somado: debate-arch debate-ux debate-pm' "$c/raw/summary.log"
-    grep -q '^## Revisao debate-design' "$c/critiques/debate-ux.md"
-    grep -q 'gate marca ok' "$c/raw/summary.log"
+    REVIEW=0 "$CLI" run "$c" --harness pi --panel design,brand --rounds 2 > "$WORK/x" 2>&1
+    grep -q '^panel: debate-arch debate-ux debate-pm debate-design debate-brand$' "$c/meta.txt"
+    grep -q 'base seat added: debate-arch debate-ux debate-pm' "$c/raw/summary.log"
+    grep -q '^## Review debate-design' "$c/critiques/debate-ux.md"
+    grep -q 'gate brand ok' "$c/raw/summary.log"
     [ -s "$c/BRANDBOOK.md" ]
-    "$CLI" status "$c" | grep -q '^marca *ok'
+    "$CLI" status "$c" | grep -q '^brand *ok'
     "$CLI" validate "$c"
-    # Com brandbook, a tag marca passa a ser cobrada no backlog.
-    sed 's/ #marca//' "$FX/BACKLOG.md" > "$c/BACKLOG.md"
-    reprova 'marca' "$c" backlog
+    # With a brandbook, the brand tag becomes required in the backlog.
+    sed 's/ #brand//' "$FX/BACKLOG.md" > "$c/BACKLOG.md"
+    reprova 'brand' "$c" backlog
   )
 }
-tp "protocolo completo ate o backlog" e2e
-tp "replica so para quem levou veto" replica_so_de_vetado
-tp "auditoria com defeito corrige 1 vez" auditoria_corrige
-tp "auditoria aprovada nao reemite o SDD" auditoria_aprova_sem_reemitir
-tp "caso antigo com propostas segue sem agenda" agenda_pulada_em_caso_antigo
-tp "status mostra a proxima fase" retoma_status
-tp "toda tarefa pede o conteudo como resposta" tarefa_pede_texto
-tp "[assumido] entre crases nao e premissa" assumido_citado
-tp "entrada editada gera aviso" defasagem
-tp "--from arquiva e refaz so dali em diante" from_arquiva
-tp "--from invalido falha cedo" from_invalido
-tp "painel com persona inexistente falha cedo" painel_invalido
-tp "teto de chamadas interrompe" teto_chamadas
-tp "segundo run recusa, lock de run morto nao trava" lock_recusa
-tp "rodar de novo reaproveita saidas" retoma
-tp "gate reprovado ganha 1 reparo" reparo
-tp "run sem instalar orienta init" sem_instalar
+tp "full protocol up to the backlog" e2e
+tp "rebuttal only for vetoed agents" replica_so_de_vetado
+tp "audit with a defect fixes once" auditoria_corrige
+tp "approved audit does not re-emit the SDD" auditoria_aprova_sem_reemitir
+tp "old case with proposals goes on without an agenda" agenda_pulada_em_caso_antigo
+tp "status shows the next phase" retoma_status
+tp "every task asks for the content as the answer, in English" tarefa_pede_texto
+tp "[assumed] in backticks is not an assumption" assumido_citado
+tp "edited input raises a warning" defasagem
+tp "--from archives and redoes only from there on" from_arquiva
+tp "invalid --from fails early" from_invalido
+tp "panel with an unknown persona fails early" painel_invalido
+tp "call cap stops the run" teto_chamadas
+tp "second run refuses, a dead run's lock does not block" lock_recusa
+tp "running again reuses outputs" retoma
+tp "failed gate gets 1 repair" reparo
+tp "run without install points to init" sem_instalar
 
-# --- harnesses: cada CLI falso devolve a resposta no formato real dele
+# --- harnesses: each fake CLI returns the answer in its real format
 
 instala_todos() {
   (
@@ -716,32 +735,32 @@ projeto_multi() {
     grep -q 'debate-arch' .agents/skills/debate/SKILL.md
     "$CLI" uninstall --project --harness codex
     "$CLI" init --project --harness agy,codex > "$WORK/x" 2>&1
-    grep -q 'dividem .agents/skills' "$WORK/x"
+    grep -q 'share .agents/skills' "$WORK/x"
     grep -q 'HARNESS=agy' .agents/skills/debate/SKILL.md
     "$CLI" uninstall --project --harness claude,agy
     ausente .claude .agents
   )
 }
-harness_nao_detectado() { nao "$CLI" init --harness nada > "$WORK/x" 2>&1; grep -q 'harness desconhecido' "$WORK/x"; }
+harness_nao_detectado() { nao "$CLI" init --harness nada > "$WORK/x" 2>&1; grep -q 'unknown harness' "$WORK/x"; }
 nada_detectado() {
   ( export PATH="/usr/bin:/bin" HOME="$WORK/home-vazio" XDG_CONFIG_HOME="$WORK/home-vazio/.config"; mkdir -p "$HOME"; nao "$CLI" init > "$WORK/x" 2>&1 )
-  grep -q 'nenhum harness detectado' "$WORK/x"
+  grep -q 'no harness detected' "$WORK/x"
 }
-t "init --all instala nos 13 harnesses" instala_todos
-t "agent do Codex e TOML valido" toml_valido
-t "update preserva modelo em linha comentada" update_preserva_modelo_comentado
-t "uninstall --all limpa tudo" desinstala_todos
-t "--project em varios harnesses" projeto_multi
-t "harness desconhecido falha" harness_nao_detectado
-t "sem harness orienta" nada_detectado
+t "init --all installs in the 13 harnesses" instala_todos
+t "Codex agent is valid TOML" toml_valido
+t "update keeps a model on a commented line" update_preserva_modelo_comentado
+t "uninstall --all cleans everything" desinstala_todos
+t "--project in several harnesses" projeto_multi
+t "unknown harness fails" harness_nao_detectado
+t "no harness gives guidance" nada_detectado
 
 protocolo_em() {
   (
     export PATH="$FAKE:$PATH"
     c="$(novo_caso)"; d="$c"
     REVIEW=0 "$CLI" run "$c" --harness "$1" --rounds 1
-    for f in research.md decision.md SDD.md BACKLOG.md backlog.csv specs/01-ingestao/spec.md specs/02-triagem/tasks.md specs/03-relatorio/plan.md; do
-      [ -s "$d/$f" ] || { echo "faltou $f"; return 1; }
+    for f in research.md decision.md SDD.md BACKLOG.md backlog.csv specs/01-ingestion/spec.md specs/02-triage/tasks.md specs/03-report/plan.md; do
+      [ -s "$d/$f" ] || { echo "missing $f"; return 1; }
     done
     "$CLI" validate "$c"
     grep -q "^harness: $1$" "$c/meta.txt"
@@ -752,11 +771,11 @@ mesa() {
     export PATH="$FAKE:$PATH"
     log="$WORK/mesa.log"; : > "$log"
     c="$(novo_caso)"
-    STUB_LOG="$log" "$CLI" run "$c" --harness claude --mesa codex,gemini --painel arch,design --rounds 1
+    STUB_LOG="$log" "$CLI" run "$c" --harness claude --mix codex,gemini --panel arch,design --rounds 1
     grep -q 'codex.*debate-arch\|^codex' "$log"
     grep -q '^gemini' "$log"
     grep -q '^claude' "$log"
-    grep -q 'rotas=debate-arch=codex debate-ux=gemini debate-pm=codex debate-design=gemini' "$c/raw/summary.log"
+    grep -q 'routes=debate-arch=codex debate-ux=gemini debate-pm=codex debate-design=gemini' "$c/raw/summary.log"
   )
 }
 custom() {
@@ -769,21 +788,21 @@ custom() {
 tempo_esgotado() {
   c="$(novo_caso)"
   nao env HARNESS=custom HARNESS_CMD='sleep 5' TIMEOUT=1 RETRIES=1 RESEARCH=0 SPECS=0 "$CLI" run "$c" --rounds 1 > "$WORK/x" 2>&1
-  grep -q 'tempo esgotado em debate-' "$c/raw/summary.log"
+  grep -q 'timed out in debate-' "$c/raw/summary.log"
 }
 binario_ausente() {
   c="$(novo_caso)"
   nao "$CLI" run "$c" --harness codex > "$WORK/x" 2>&1
-  grep -q 'codex nao encontrado' "$WORK/x"
+  grep -q 'codex not found' "$WORK/x"
 }
 retoma_specs() {
   (
     export PATH="$FAKE:$PATH"
     c="$(novo_caso)"
     "$CLI" run "$c" --harness pi --rounds 1
-    echo editado >> "$c/specs/01-ingestao/spec.md"
+    echo edited >> "$c/specs/01-ingestion/spec.md"
     "$CLI" run "$c" --harness pi --rounds 1
-    grep -q '^editado$' "$c/specs/01-ingestao/spec.md"
+    grep -q '^edited$' "$c/specs/01-ingestion/spec.md"
   )
 }
 spec_reparo() {
@@ -791,27 +810,27 @@ spec_reparo() {
     export PATH="$FAKE:$PATH"
     c="$(novo_caso)"; rm -f "$STUB_STATE".*
     FAIL_ONCE=spec-bundle.md "$CLI" run "$c" --harness pi --rounds 1
-    grep -q 'gate spec reprovado' "$c/raw/summary.log"
-    grep -q 'gate specs ok' "$c/raw/summary.log"
+    grep -q 'spec gate failed' "$c/raw/summary.log"
+    grep -q 'specs gate ok' "$c/raw/summary.log"
   )
 }
 probe() {
   ( export PATH="$FAKE:$PATH"; for h in claude codex gemini; do "$ROOT/template/skills/architect-debate/scripts/probe.sh" "$h"; done )
 }
-for h in claude codex cursor gemini agy omp pi dsh droid copilot qwen cline; do tp "protocolo completo via $h" protocolo_em "$h"; done
-tp "painel com debate-sec" painel_com_sec
-tp "painel com designer e diretor de arte" painel_de_marca
-tp "agents rodam em sala sem saida de rival" sala_cega
-tp "limite 429 espera e tenta de novo" limite_espera
-tp "auth falha nao repete" auth_nao_repete
-tp "PARALELO limita chamadas simultaneas" paralelo_limita
-tp "interrupcao mata as chamadas em andamento" interrompe_mata_filhos
-tp "mesa distribui o painel entre harnesses" mesa
-tp "harness custom via HARNESS_CMD" custom
-tp "timeout diz que foi timeout" tempo_esgotado
-tp "binario ausente falha cedo" binario_ausente
-tp "rerun nao sobrescreve spec editada" retoma_specs
-tp "spec reprovada ganha reparo" spec_reparo
+for h in claude codex cursor gemini agy omp pi dsh droid copilot qwen cline; do tp "full protocol through $h" protocolo_em "$h"; done
+tp "panel with debate-sec" painel_com_sec
+tp "panel with a designer and an art director" painel_de_marca
+tp "agents run in a room without rival output" sala_cega
+tp "429 limit waits and retries" limite_espera
+tp "auth failure does not retry" auth_nao_repete
+tp "PARALLEL caps simultaneous calls" paralelo_limita
+tp "interrupt kills the calls in flight" interrompe_mata_filhos
+tp "mix spreads the panel across harnesses" mesa
+tp "custom harness through HARNESS_CMD" custom
+tp "timeout says it was a timeout" tempo_esgotado
+tp "missing binary fails early" binario_ausente
+tp "rerun does not overwrite an edited spec" retoma_specs
+tp "failed spec gets a repair" spec_reparo
 em_dash() {
   [ -x /bin/dash ] || return 0
   S="$ROOT/template/skills/architect-debate/scripts"
@@ -828,10 +847,10 @@ EOF
   /bin/dash "$WORK/d.sh" > "$WORK/d.saida" 2>&1
   [ ! -s "$WORK/d.saida" ]
 }
-tp "probe faz chamada pelo adapter" probe
-tp "adapter grava em arquivo e calcula timeout sob dash" em_dash
+tp "probe calls through the adapter" probe
+tp "adapter writes to a file and computes the timeout under dash" em_dash
 
-# --- instalador de uma linha, sem rede
+# --- one-line installer, without network
 bootstrap() {
   tar -czf "$WORK/pacote.tgz" -C "$ROOT/.." "$(basename "$ROOT")"
   (
@@ -843,12 +862,12 @@ bootstrap() {
   )
   [ "$("$WORK/od-bin/open-debate" --version)" = "$(jq -r .version "$ROOT/package.json")" ]
 }
-tp "install.sh instala e reinstala" bootstrap
+tp "install.sh installs and reinstalls" bootstrap
 upgrade_sem_ref() { nao "$CLI" upgrade --check 2>/dev/null; }
-tp "upgrade recusa instalacao sem install.sh" upgrade_sem_ref
+tp "upgrade refuses an install without install.sh" upgrade_sem_ref
 
-# --- execucao. Os testes `t` mexem na instalacao: rodam em ordem, num job so do pool, com HOME proprio.
-# Os `tp` dividem o HOME principal, onde o opencode e instalado 1 vez antes, e so o leem.
+# --- execution. The `t` tests touch the install: they run in order, in a single pool job, with their own HOME.
+# The `tp` tests share the main HOME, where opencode is installed once beforehand, and only read it.
 "$CLI" init --harness opencode > "$WORK/init-pool" 2>&1 || { cat "$WORK/init-pool"; exit 1; }
 cadeia() {
   export HOME="$WORK/home-inst" XDG_CONFIG_HOME="$WORK/home-inst/.config"; mkdir -p "$HOME"
@@ -865,7 +884,7 @@ cadeia &
 k=0
 while IFS='|' read -r tipo nome cmd; do
   k=$((k + 1)); [ "$tipo" = "p" ] || continue
-  # Vaga: tira do pool quem ja terminou; cheio, espera o mais antigo.
+  # Slot: drop finished jobs from the pool; when full, wait for the oldest.
   while :; do
     vivos=""; nv=0
     for p_ in $(cat "$WORK/.pids"); do if kill -0 "$p_" 2>/dev/null; then vivos="$vivos $p_"; nv=$((nv + 1)); fi; done
@@ -881,5 +900,5 @@ wait
 k=0
 while IFS='|' read -r tipo nome cmd; do k=$((k + 1)); relata "$WORK/t$k" "$nome"; done < "$REG"
 
-printf '\n%s ok, %s falha(s)\n' "$PASS" "$FAIL"
+printf '\n%s ok, %s failure(s)\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

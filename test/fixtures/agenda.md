@@ -1,11 +1,11 @@
 # Agenda
 
-| ID | Decisao | Opcoes | Dono | Driver |
+| ID | Decision | Options | Owner | Driver |
 |---|---|---|---|---|
-| D1 | Monolito ou servicos? | Monolito modular / Servicos | debate-arch | prazo |
-| D2 | Direcao visual densa ou leve? | Densa / Leve | debate-ux | velocidade |
-| D3 | Banco relacional ou documento? | Cloud SQL / Firestore | debate-arch | custo |
+| D1 | Monolith or services? | Modular monolith / Services | debate-arch | deadline |
+| D2 | Dense or light visual direction? | Dense / Light | debate-ux | speed |
+| D3 | Relational or document database? | Cloud SQL / Firestore | debate-arch | cost |
 
-## Fora da pauta
+## Off the agenda
 
-Multi-regiao: o brief nao pede.
+Multi-region: the brief does not ask for it.

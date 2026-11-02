@@ -1,17 +1,17 @@
 #!/bin/sh
-# Stub do opencode para os testes: sem rede e sem LLM. `run` devolve o fixture da fase no JSON do opencode.
+# opencode stub for the tests: no network and no LLM. `run` returns the phase fixture in opencode's JSON.
 set -eu
 FX="$(CDPATH= cd -- "$(dirname -- "$0")/../fixtures" && pwd)"
 [ -z "${STUB_LOG:-}" ] || printf '%s\n' "$*" >> "$STUB_LOG"
 
 if [ "${1:-}" = "models" ]; then
-  printf 'opencode/gratis-a\n{"id":"gratis-a","providerID":"opencode","status":"active","cost":{"input":0,"output":0},"capabilities":{"toolcall":true}}\n'
-  printf 'opencode/gratis-b\n{"id":"gratis-b","providerID":"opencode","status":"active","cost":{"input":0,"output":0},"capabilities":{"toolcall":true}}\n'
-  printf 'opencode/pago\n{"id":"pago","providerID":"opencode","status":"active","cost":{"input":1,"output":2},"capabilities":{"toolcall":true}}\n'
+  printf 'opencode/free-a\n{"id":"free-a","providerID":"opencode","status":"active","cost":{"input":0,"output":0},"capabilities":{"toolcall":true}}\n'
+  printf 'opencode/free-b\n{"id":"free-b","providerID":"opencode","status":"active","cost":{"input":0,"output":0},"capabilities":{"toolcall":true}}\n'
+  printf 'opencode/paid\n{"id":"paid","providerID":"opencode","status":"active","cost":{"input":1,"output":2},"capabilities":{"toolcall":true}}\n'
   exit 0
 fi
 
-[ "${1:-}" = "run" ] || { echo "stub: comando nao suportado: $*" >&2; exit 2; }
+[ "${1:-}" = "run" ] || { echo "stub: unsupported command: $*" >&2; exit 2; }
 agent=""; task=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -24,27 +24,27 @@ done
 
 short="${agent#debate-}"
 case "$task" in
-  "modo pesquisa"*) f=research.md ;;
-  "modo fact-check"*) f=research-check.md ;;
-  "fase agenda"*) f=agenda.md ;;
-  "fase proposta"*) f="proposta-$short.md" ;;
-  "fase ataque"*) f=ataque.md; [ "$short" = "ux" ] && f=ataque-ux.md ;;
-  "fase replica"*) f=replica.md ;;
-  "fase decisao"*) f=decision.md ;;
-  "fase sdd"*|"fase correcao"*) f=SDD.md ;;
-  "fase marca"*) f=BRANDBOOK.md ;;
-  "fase auditoria"*) f="${STUB_AUDITORIA:-auditoria.md}" ;;
-  "fase spec"*) f=spec-bundle.md ;;
-  "fase backlog-design"*|"fase backlog-eng"*) f=trilha.md ;;
-  "fase backlog"*) f=BACKLOG.md ;;
-  *) echo "stub: tarefa desconhecida: $task" >&2; exit 2 ;;
+  "phase research"*) f=research.md ;;
+  "phase fact-check"*) f=research-check.md ;;
+  "phase agenda"*) f=agenda.md ;;
+  "phase proposal"*) f="proposal-$short.md" ;;
+  "phase critique"*) f=critique.md; [ "$short" = "ux" ] && f=critique-ux.md ;;
+  "phase rebuttal"*) f=rebuttal.md ;;
+  "phase decision"*) f=decision.md ;;
+  "phase sdd"*|"phase fix"*) f=SDD.md ;;
+  "phase brand"*) f=BRANDBOOK.md ;;
+  "phase audit"*) f="${STUB_AUDIT:-audit.md}" ;;
+  "phase spec"*) f=spec-bundle.md ;;
+  "phase backlog-design"*|"phase backlog-eng"*) f=track.md ;;
+  "phase backlog"*) f=BACKLOG.md ;;
+  *) echo "stub: unknown task: $task" >&2; exit 2 ;;
 esac
 
-# FAIL_ONCE=<fixture>: a 1a chamada entrega saida reprovada, para exercitar o reparo do gate
+# FAIL_ONCE=<fixture>: the 1st call returns a failing output, to exercise the gate repair
 if [ "${FAIL_ONCE:-}" = "$f" ] && [ ! -e "$STUB_STATE.$f" ]; then
   : > "$STUB_STATE.$f"
-  printf 'sem nada util\nlinha\nlinha\nlinha\nlinha\nlinha\n' | jq -Rs '{type:"text",part:{text:.}}' -c
+  printf 'nothing useful\nline\nline\nline\nline\nline\n' | jq -Rs '{type:"text",part:{text:.}}' -c
   exit 0
 fi
 rival="$(printf '%s' "$task" | grep -Eo 'proposals/debate-[a-z0-9]+' | head -1 | sed 's#proposals/##')"
-if [ "$f" = "ataque.md" ] || [ "$f" = "ataque-ux.md" ]; then sed "s/debate-gcp/$rival/g" "$FX/$f"; else cat "$FX/$f"; fi | jq -Rs '{type:"text",part:{text:.}}' -c
+if [ "$f" = "critique.md" ] || [ "$f" = "critique-ux.md" ]; then sed "s/debate-gcp/$rival/g" "$FX/$f"; else cat "$FX/$f"; fi | jq -Rs '{type:"text",part:{text:.}}' -c

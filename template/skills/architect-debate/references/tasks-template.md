@@ -1,23 +1,23 @@
 # Tasks <nn> - <slug>
 
-Formato: `- [ ] T001 [P] [US1] acao + path`. `[P]` so sem dependencia pendente. `[USn]` so em fase de story. IDs sequenciais em ordem de execucao.
+Format: `- [ ] T001 [P] [US1] action + path`. `[P]` only with no pending dependency. `[USn]` only in a story phase. Sequential IDs in execution order.
 
-## Fase 1 - Setup
+## Phase 1 - Setup
 
-Init do projeto, sem label de story.
+Project init, no story label.
 
-## Fase 2 - Base
+## Phase 2 - Foundation
 
-Bloqueantes de todas as stories, sem label.
+Blockers for every story, no label.
 
-## Fase 3+ - US1, US2
+## Phase 3+ - US1, US2
 
-Uma fase por story em ordem P1, P2. Cada fase: meta em 1 linha, criterio de teste isolado, tasks.
+One phase per story in P1, P2 order. Each phase: goal in 1 line, isolated test criterion, tasks.
 
 ## Final - Polish
 
-Cross-cutting: logs, metricas, docs, limpeza.
+Cross-cutting: logs, metrics, docs, cleanup.
 
-## Dependencias e ondas
+## Dependencies and waves
 
-Ordem de conclusao das stories e ondas de paralelo (wave 1..n) para execucao concorrente.
+Story completion order and parallel waves (wave 1..n) for concurrent execution.

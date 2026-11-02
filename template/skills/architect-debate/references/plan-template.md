@@ -1,25 +1,25 @@
 # Plan <nn> - <slug>
 
-## 1. Stack e servicos
+## 1. Stack and services
 
-Tabela item | decisao | ADR | motivo, max 8 linhas. Sem servico sem motivo contra a alternativa.
+Table item | decision | ADR | reason, max 8 rows. No service without a reason against the alternative.
 
-## 2. Dados e migracoes
+## 2. Data and migrations
 
-Entidades e dono, schema expand-contract, migracao backward compatible, rollback testado.
+Entities and owner, expand-contract schema, backward compatible migration, tested rollback.
 
-## 3. Contratos e sequencia
+## 3. Contracts and sequence
 
-Endpoints ou eventos versionados, fluxo principal em ate 8 linhas (ou bloco mermaid sequenceDiagram).
+Versioned endpoints or events, primary flow in up to 8 lines (or a mermaid sequenceDiagram block).
 
-## 4. Falhas e limites
+## 4. Failures and limits
 
-Por path async: timeout por hop, retry com teto, DLQ, chave de idempotencia, limite de fila.
+Per async path: timeout per hop, capped retry, DLQ, idempotency key, queue limit.
 
-## 5. Observabilidade
+## 5. Observability
 
-SLI do fluxo, metricas RED, log estruturado com trace id, alerta com dono.
+Flow SLI, RED metrics, structured logs with trace id, alert with an owner.
 
-## 6. Testes
+## 6. Tests
 
-1 teste por requisito do spec, verbo + condicao + resultado. Fitness function afetada.
+1 test per spec requirement, verb + condition + result. Affected fitness function.

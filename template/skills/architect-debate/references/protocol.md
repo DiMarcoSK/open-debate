@@ -1,52 +1,53 @@
-# Protocolo do debate - estado e gates
+# Debate protocol - state and gates
 
-## Estado
+## State
 
 ```text
 cases/<slug>/
   idea.md  meta.txt  brief.md  constitution.md
-  regras-debate.md  visual-contract.md  *-template.md
-  research.md                  fase 1, debate-research
-  agenda.md                    fase 1b, debate-judge: decisoes em disputa
-  proposals/<agent>.md         fase 2
-  critiques/<agent>.md         fase 3
-  research-check.md            fase 4, fact-check
-  proposals/<agent>-r2.md      fase 5
-  decision.md  adr/NNNN-*.md   fase 6
-  SDD.md  auditoria.md         fase 6, debate-judge e debate-auditor
-  style-tile.html tokens.json tokens.css   gerados do TOKENS do SDD (DTCG)
-  BRANDBOOK.md                 fase 6d, debate-brand (so com ele no painel)
-  specs/<nn>-<slug>/{spec,plan,tasks}.md  checklists/requirements-<nn>-<slug>.md   fase 7
-  backlog/design.md  backlog/eng.md   fase 8, rascunhos por trilha
-  BACKLOG.md  backlog.csv  backlog.json  backlog-gh.sh   fase 8, debate-pm + export
-  raw/   json bruto, stderr, summary.log, metricas.tsv, arquivo/ (saidas trocadas por --from)
+  debate-rules.md  visual-contract.md  *-template.md
+  research.md                  phase 1, debate-research
+  agenda.md                    phase 1b, debate-judge: contested decisions
+  proposals/<agent>.md         phase 2
+  critiques/<agent>.md         phase 3
+  research-check.md            phase 4, fact-check
+  proposals/<agent>-r2.md      phase 5
+  decision.md  adr/NNNN-*.md   phase 6
+  SDD.md  audit.md             phase 6, debate-judge and debate-auditor
+  style-tile.html tokens.json tokens.css   generated from the SDD TOKENS (DTCG)
+  BRANDBOOK.md                 phase 6d, debate-brand (only with it on the panel)
+  specs/<nn>-<slug>/{spec,plan,tasks}.md  checklists/requirements-<nn>-<slug>.md   phase 7
+  backlog/design.md  backlog/eng.md   phase 8, drafts per track
+  BACKLOG.md  backlog.csv  backlog.json  backlog-gh.sh   phase 8, debate-pm + export
+  raw/   raw json, stderr, summary.log, metrics.tsv, archive/ (outputs replaced by --from)
 ```
 
-## Gates (gate.sh no modo sessao, debate.sh no CLI; reprovou = 1 reparo com o motivo, reprovou de novo = para)
+## Gates (gate.sh in session mode, debate.sh in the CLI; fail = 1 repair with the reason, fail again = stop)
 
-| Fase | Gate |
+| Phase | Gate |
 |---|---|
-| 0 intake | validate.sh: brief sem campo vazio |
-| 1 pesquisa | >= 5 URLs distintas, >= 5 achados Rn com URL ou `nao verificado`, secao Lacunas |
-| 1b agenda | 3-8 decisoes Dn, 2+ opcoes, dono no painel, driver |
-| 2 proposta | concessao, posicao em cada Dn, id Rn existente, teto de linhas; arch: mermaid, ADR, capacidade; ux: WCAG, heuristicas, teste de usabilidade, estados, lista banida, contraste sem debate-brand; pm: MVP, metrica, premissas; design: fluxos, inventario de telas, estados, lista banida; brand: contraste, lista banida, voz, logo, plataforma; gcp e aws: custo, IAM, budget; k8s: custo, rollback; sec: STRIDE, autorizacao, auditoria; ai: eval, fallback, custo; data: pipeline, qualidade, retencao, custo; mobile: offline, loja, versao minima |
-| 3 ataque | 1-3 vetos, nenhum contra si, citacao achada literalmente no arquivo citado, id Rn existente, concessao; ux com design no painel: secao Revisao debate-design |
-| 4 fact-check | nao bloqueia; falha vira aviso em research-check.md |
-| 5 replica | so quem levou veto; nao bloqueia; falha cai para a proposta r1 |
-| 6 decisao | pesos somam 100, conta de cada placar confere, todo Dn decidido, todo veto julgado, todo claim errado zerado, >= 3 ADRs MADR com Resultado, Opcoes e Confirmacao, indice de 3-6 specs, Dissenso |
-| 6 SDD | secoes 0-8, mermaid, TOKENS com contraste e identico a decision.md, todo ADR citado, Vazio/Loading/Erro, lista banida, sem placeholder |
-| 6 auditoria | Veredito; CORRIGIR traz linhas An e o juiz corrige so o que elas apontam; falha do provider nao bloqueia |
-| 6d marca | so com debate-brand: secoes 1-8, TOKENS identico ao SDD e com contraste, logo, voz, 1+ tela adaptada, lista banida, sem placeholder |
-| 7 specs | EARS, ADR citado existe, toda US com task, sem placeholder, checklist |
-| 8 trilhas | rascunho com 8+ itens e Aceite |
-| 8 backlog | 15+ itens, 4+ fases, cada item com Aceite, origem, est P/M/G; deps existem e sem ciclo; toda tag de lapidacao.md, spec, task e ADR coberta; conta de capacidade confere e o plano cabe; DoD |
+| 0 intake | validate.sh: brief with no empty field |
+| 1 research | >= 5 distinct URLs, >= 5 Rn findings with a URL or `unverified`, Gaps section |
+| 1b agenda | 3-8 Dn decisions, 2+ options, owner on the panel, driver |
+| 2 proposal | concession, position on each Dn, existing Rn ids, line cap; arch: mermaid, ADR, capacity; ux: WCAG, heuristics, usability test, states, banned list, contrast without debate-brand; pm: MVP, metric, assumptions; design: flows, screen inventory, states, banned list; brand: contrast, banned list, voice, logo, platform; gcp and aws: cost, IAM, budget; k8s: cost, rollback; sec: STRIDE, authorization, audit; ai: eval, fallback, cost; data: pipeline, quality, retention, cost; mobile: offline, store, minimum version |
+| 3 critique | 1-3 vetoes, none against self, quote found literally in the cited file, existing Rn ids, concession; ux with design on the panel: Review debate-design section |
+| 4 fact-check | does not block; a failure becomes a notice in research-check.md |
+| 5 rebuttal | only agents that took a veto; does not block; a failure falls back to the r1 proposal |
+| 6 decision | weights sum 100, every score adds up, every Dn decided, every veto ruled, every wrong claim zeroed, >= 3 MADR ADRs with Decision outcome, Considered options and Confirmation, index of 3-6 specs, Dissent |
+| 6 SDD | sections 0-8, mermaid, TOKENS with contrast and identical to decision.md, every ADR cited, Empty/Loading/Error, banned list, no placeholder |
+| 6 audit | Verdict; FIX carries An rows and the judge fixes only what they name; a provider failure does not block |
+| 6d brand | only with debate-brand: sections 1-8, TOKENS identical to the SDD and with contrast, logo, voice, 1+ adapted screen, banned list, no placeholder |
+| 7 specs | EARS, cited ADR exists, every US has a task, no placeholder, checklist |
+| 8 tracks | draft with 8+ items and Acceptance |
+| 8 backlog | 15+ items, 4+ phases, every item with Acceptance, source, est S/M/L; deps exist and no cycle; every polish.md tag, spec, task and ADR covered; capacity math adds up and the plan fits; DoD |
 
-## Limites
+## Limits
 
-- rounds 1-3 (1 = so proposta, 2 = +ataque e fact-check, 3 = +replica)
-- painel 3-8 agents: debate-arch, debate-ux e debate-pm sempre; opcionais pelo brief (references/painel.conf, `painel.sh`); juiz, pesquisador e auditor fora do painel
-- resume por padrao: saida existente e reaproveitada; `FRESH=1` refaz tudo; `--from <fase>` arquiva a fase e as seguintes em raw/arquivo e refaz; `status` mostra a proxima fase e avisa quando uma saida e mais velha que a entrada
-- proposta e ataque rodam em sala: diretorio so com o que o agent pode ler, sem saida de rival
-- provider falhou: modo sessao repete o Task 1x e segue com painel >= 2; CLI espera com backoff em limite, usa `MODEL_FALLBACK` 1x em auth ou cota
-- `PARALELO` limita chamadas simultaneas, `MAX_CHAMADAS` limita o run, 1 run por caso (raw/.lock)
-- fase 7 no CLI: 1 chamada por item do indice de decision.md; `SPECS=0` deixa as specs para preenchimento manual
+- rounds 1-3 (1 = proposal only, 2 = +critique and fact-check, 3 = +rebuttal)
+- panel of 3-8 agents: debate-arch, debate-ux and debate-pm always; optional seats from the brief (references/panel.conf, `panel.sh`); judge, researcher and auditor sit outside the panel
+- resume by default: an existing output is reused; `FRESH=1` redoes everything; `--from <phase>` archives that phase and the later ones in raw/archive and redoes them; `status` shows the next phase and warns when an output is older than its input
+- proposal and critique run in a room: a directory with only what the agent may read, no rival output
+- provider failed: session mode retries the Task 1x and continues with a panel >= 2; the CLI waits with backoff on a limit, uses `MODEL_FALLBACK` 1x on auth or quota
+- `PARALLEL` caps simultaneous calls, `MAX_CALLS` caps the run, 1 run per case (raw/.lock)
+- phase 7 in the CLI: 1 call per item of the decision.md index; `SPECS=0` leaves the specs for manual filling
+- language: input in any language, every artifact in English

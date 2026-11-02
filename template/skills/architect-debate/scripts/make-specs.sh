@@ -1,14 +1,14 @@
 #!/bin/sh
-# make-specs.sh <case-dir> <slug1> [slug2...] - cria specs/<nn>-<slug>/ a partir dos templates.
-# Idempotente: slug existente e pulado. NN = max existente + 1.
+# make-specs.sh <case-dir> <slug1> [slug2...] - creates specs/<nn>-<slug>/ from the templates.
+# Idempotent: an existing slug is skipped. NN = highest existing + 1.
 set -eu
-CASE_DIR="${1:?uso: make-specs.sh <case-dir> <slug1> [slug2...]}"
+CASE_DIR="${1:?usage: make-specs.sh <case-dir> <slug1> [slug2...]}"
 shift
-[ "$#" -ge 1 ] || { echo "erro: informe ao menos 1 slug" >&2; exit 2; }
+[ "$#" -ge 1 ] || { echo "error: give at least 1 slug" >&2; exit 2; }
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 REF="$SCRIPT_DIR/../references"
 for f in spec-template.md plan-template.md tasks-template.md checklist-template.md; do
-  [ -f "$REF/$f" ] || { echo "erro: referencia ausente: $REF/$f" >&2; exit 2; }
+  [ -f "$REF/$f" ] || { echo "error: missing reference: $REF/$f" >&2; exit 2; }
 done
 mkdir -p "$CASE_DIR/specs" "$CASE_DIR/checklists"
 clean() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9][^a-z0-9]*/-/g; s/^-\{1,\}//; s/-\{1,\}$//' | cut -c1-40; }
@@ -27,9 +27,9 @@ max_n() {
 N="$(max_n)"
 for raw in "$@"; do
   slug="$(clean "$raw")"
-  [ -n "$slug" ] || { echo "erro: slug invalido: $raw" >&2; exit 2; }
+  [ -n "$slug" ] || { echo "error: invalid slug: $raw" >&2; exit 2; }
   if ls -d "$CASE_DIR/specs/"*-"$slug" >/dev/null 2>&1; then
-    echo "pulo $slug: ja existe em $CASE_DIR/specs"
+    echo "skip $slug: already exists in $CASE_DIR/specs"
     continue
   fi
   N=$((N + 1)); NN="$(printf '%02d' "$N")"; D="$CASE_DIR/specs/$NN-$slug"

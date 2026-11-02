@@ -1,10 +1,10 @@
 ---
-description: Debate de arquitetura e design com pesquisa, subagents em paralelo e juiz. Entrega SDD, ADRs (MADR), tokens (DTCG) e specs
+description: Architecture and design debate with research, parallel subagents and a judge. Delivers SDD, ADRs (MADR), tokens (DTCG), specs and backlog
 agent: debate
 ---
 
-Carrega a skill architect-debate e segue o SKILL.md no modo sessao, sem pular o intake.
+Load the skill architect-debate and follow SKILL.md in session mode, without skipping the intake.
 
-Opcoes (opcional): `--painel design,brand,sec` (arch, ux e pm entram sempre) `--rounds 1-3` `--sem-pesquisa` `--sem-factcheck`.
+Options (optional): `--panel design,brand,sec` (arch, ux and pm always sit) `--rounds 1-3` `--no-research` `--no-factcheck`.
 
-Ideia a debater: $ARGUMENTS
+Idea to debate: $ARGUMENTS

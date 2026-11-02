@@ -1,13 +1,13 @@
 # Checklist - <nn> <slug>
 
-Gate antes de implementar. Tudo marcado ou tem dono e issue.
+Gate before implementing. Everything checked, or it has an owner and an issue.
 
-- [ ] cada US tem criterio testavel em 1 linha e ao menos 1 requisito nao funcional com numero
-- [ ] cada decisao aponta um ADR com alternativa rejeitada
-- [ ] nenhum `[assumido]` sem dono e semana no mesmo colchete
-- [ ] cada path async tem timeout, retry com teto, DLQ, idempotencia
-- [ ] SLI e alerta definidos para o fluxo principal
-- [ ] tokens do SDD usados, contraste AA, foco e teclado cobertos (ou `sem UI` com motivo)
-- [ ] estados Vazio/Loading/Erro/Sucesso escritos (ou `sem UI` com motivo)
-- [ ] nenhum item da lista banida sem override escrito
-- [ ] escopo fecha no prazo com o time atual
+- [ ] every US has a testable criterion in 1 line and at least 1 non-functional requirement with a number
+- [ ] every decision points to an ADR with a rejected alternative
+- [ ] no `[assumed]` without owner and week in the same bracket
+- [ ] every async path has timeout, capped retry, DLQ, idempotency
+- [ ] SLI and alert defined for the primary flow
+- [ ] SDD tokens used, AA contrast, focus and keyboard covered (or `no UI` with the reason)
+- [ ] Empty/Loading/Error/Success states written (or `no UI` with the reason)
+- [ ] no banned-list item without a written override
+- [ ] scope fits the deadline with the current team

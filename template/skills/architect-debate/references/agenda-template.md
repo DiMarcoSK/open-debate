@@ -1,14 +1,14 @@
-# Agenda - decisoes em disputa
+# Agenda - contested decisions
 
-Pauta do debate: so o que muda custo, prazo, risco ou experiencia e ainda tem mais de 1 resposta defensavel. 3-8 linhas.
-O que o brief ou constitution.md ja decide nao entra. Toda proposta se posiciona em cada Dn; o juiz fecha cada Dn.
+The debate's agenda: only what changes cost, deadline, risk or experience and still has more than 1 defensible answer. 3-8 rows.
+What brief.md or constitution.md already settles stays out. Every proposal takes a position on each Dn; the judge closes each Dn.
 
-| ID | Decisao (pergunta fechada) | Opcoes (separadas por " / ") | Dono | Driver |
+| ID | Decision (closed question) | Options (separated by " / ") | Owner | Driver |
 |---|---|---|---|---|
 | D1 | | A / B | debate-arch | |
 
-Dono: agent do painel que abre a discussao. Driver: criterio do brief que desempata.
+Owner: the panel agent that opens the discussion. Driver: the brief criterion that breaks the tie.
 
-## Fora da pauta
+## Off the agenda
 
-1 linha por tema descartado, com motivo.
+1 line per discarded topic, with the reason.

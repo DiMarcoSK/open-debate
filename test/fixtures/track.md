@@ -1,0 +1,9 @@
+- Item 1. Acceptance: works within 1 s (SDD-5) {S, #copy}
+- Item 2. Acceptance: works within 2 s (SDD-5) {S, #copy}
+- Item 3. Acceptance: works within 3 s (SDD-5) {S, #copy}
+- Item 4. Acceptance: works within 4 s (SDD-5) {S, #copy}
+- Item 5. Acceptance: works within 5 s (SDD-5) {S, #copy}
+- Item 6. Acceptance: works within 6 s (SDD-5) {S, #copy}
+- Item 7. Acceptance: works within 7 s (SDD-5) {S, #copy}
+- Item 8. Acceptance: works within 8 s (SDD-5) {S, #copy}
+- Item 9. Acceptance: works within 9 s (SDD-5) {S, #copy}

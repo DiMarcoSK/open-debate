@@ -1,48 +1,48 @@
-# SDD - <nome do produto>
+# SDD - <product name>
 
-## 0. Resumo
+## 0. Summary
 
-5 linhas para quem so le isto: problema, decisao principal, custo/mes, prazo, maior risco.
+5 lines for someone who reads only this: problem, main decision, cost/month, deadline, biggest risk.
 
-## 1. Contexto e objetivo
+## 1. Context and goal
 
-Objetivo em 1 frase, quem usa, problema que some, metrica de sucesso em 90 dias. Nao-objetivos em 1 linha cada.
+Goal in 1 sentence, who uses it, the problem that goes away, 90-day success metric. Non-goals in 1 line each.
 
-## 2. Restricoes, premissas e drivers
+## 2. Constraints, assumptions and drivers
 
-Prazo, time, custo teto, carga, dados sensiveis. Premissa nao confirmada leva `[assumido, dono <nome>, <semana>]`.
-Drivers de qualidade: 3 cenarios `estimulo -> resposta -> medida`. Evidencia: research.md (ids citados no texto).
+Deadline, team, cost ceiling, load, sensitive data. An unconfirmed assumption carries `[assumed, owner <name>, <week>]`.
+Quality drivers: 3 scenarios `stimulus -> response -> measure`. Evidence: research.md (ids cited in the text).
 
-## 3. Decisoes
+## 3. Decisions
 
-| ADR | Decisao | Alternativa rejeitada | Driver |
+| ADR | Decision | Rejected alternative | Driver |
 
-1 linha por ADR de adr/, sem paragrafo.
+1 row per ADR in adr/, no paragraph.
 
-## 4. Arquitetura
+## 4. Architecture
 
-C4 contexto e container em bloco mermaid. Capacidade com a conta (rps medio, pico, dado/ano).
-Modulos e contratos versionados. Dados: dono por entidade, consistencia, backup, RPO/RTO.
-Falhas por path: timeout, retry com teto, DLQ, chave de idempotencia. Seguranca: STRIDE top 3.
-Cada servico com req/dia e custo/mes.
+C4 context and container in a mermaid block. Capacity with the arithmetic (average rps, peak, data/year).
+Modules and versioned contracts. Data: owner per entity, consistency, backup, RPO/RTO.
+Failures per path: timeout, capped retry, DLQ, idempotency key. Security: STRIDE top 3.
+Every service with req/day and cost/month.
 
-## 5. Experiencia e direcao visual (gate em visual-contract.md)
+## 5. Experience and visual direction (gated by visual-contract.md)
 
-JTBD e tarefa critica com meta de passos/segundos. Metas de usabilidade e plano WCAG 2.2 AA (debate-ux).
-Fluxos com contagem de passos e inventario de telas (debate-design), com os ajustes da revisao de debate-ux aplicados.
-Conceito: <metafora>, convencao mantida e quebrada; com debate-brand no painel, a marca e o BRANDBOOK.md.
-Bloco TOKENS literal com razoes de contraste. Escala de tipo, espaco, raio, elevacao, movimento.
-Telas-chave em wireframe ASCII. Estados escritos: Vazio, Loading, Erro, Sucesso, Parcial.
-Momento assinatura com custo. Lista banida confirmada ausente ou override escrito por item.
+JTBD and critical task with a steps/seconds goal. Usability goals and WCAG 2.2 AA plan (debate-ux).
+Flows with step counts and screen inventory (debate-design), with the debate-ux review fixes applied.
+Concept: <metaphor>, convention kept and broken; with debate-brand on the panel, the brand lives in BRANDBOOK.md.
+Literal TOKENS block with contrast ratios. Type scale, spacing, radius, elevation, motion.
+Key screens as ASCII wireframes. Written states: Empty, Loading, Error, Success, Partial.
+Signature moment with cost. Banned list confirmed absent, or a written override per item.
 
-## 6. Cortes e backlog
+## 6. Cuts and backlog
 
-O que ficou fora do MVP e por que, 1 linha cada.
+What stayed out of the MVP and why, 1 line each.
 
-## 7. Testes de aceitacao, SLO e fitness functions
+## 7. Acceptance tests, SLO and fitness functions
 
-1 teste por item mantido, verbo + condicao + resultado. SLO do fluxo principal. Fitness functions no CI.
+1 test per kept item, verb + condition + result. Primary flow SLO. Fitness functions in CI.
 
-## 8. Riscos, dissenso e perguntas abertas
+## 8. Risks, dissent and open questions
 
-Registro de riscos: | Risco | Prob (B/M/A) | Impacto (B/M/A) | Mitigacao | Dono |, max 5. Dissenso registrado nos ADRs. Max 3 perguntas abertas.
+Risk register: | Risk | Prob (L/M/H) | Impact (L/M/H) | Mitigation | Owner |, max 5. Dissent recorded in the ADRs. Max 3 open questions.

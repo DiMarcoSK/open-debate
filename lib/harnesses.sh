@@ -1,30 +1,30 @@
-# harnesses.sh - catalogo de harnesses (source de bin/open-debate).
-# h_load <id> preenche:
-#   H_ID H_NAME H_BINS  binarios aceitos, separados por espaco
-#   H_USER              raiz da instalacao por usuario
-#   H_PROJ              raiz da instalacao por projeto, relativa ao cwd ("." = o proprio projeto)
-#   H_SKILLS H_AGENTS H_CMDS  diretorios relativos a raiz; vazio = nao existe no harness
-#   H_FMT               formato de agent: opencode claude codex cursor gemini omp droid copilot qwen none
-#   H_MODE              native (agents e comando proprios), subagents (entrada + agents) ou cli (entrada + headless)
-#   H_INVOKE            como o usuario chama o debate
-#   H_DELEGATE          instrucao de delegacao dada ao orquestrador
-#   H_MARK              diretorio cuja existencia indica o harness, alem do binario
-#   H_EVID              rodou = chamado de verdade; docs = so documentacao oficial
+# harnesses.sh - harness catalog (sourced by bin/open-debate).
+# h_load <id> fills:
+#   H_ID H_NAME H_BINS  accepted binaries, space separated
+#   H_USER              per-user install root
+#   H_PROJ              per-project install root, relative to cwd ("." = the project itself)
+#   H_SKILLS H_AGENTS H_CMDS  directories relative to the root; empty = does not exist in the harness
+#   H_FMT               agent format: opencode claude codex cursor gemini omp droid copilot qwen none
+#   H_MODE              native (own agents and command), subagents (entry + agents) or cli (entry + headless)
+#   H_INVOKE            how the user calls the debate
+#   H_DELEGATE          delegation instruction given to the orchestrator
+#   H_MARK              directory whose existence signals the harness, besides the binary
+#   H_EVID              ran = actually called; docs = official docs only
 HARNESSES="opencode claude codex cursor gemini agy omp pi dsh droid copilot qwen cline"
 
 h_load() {
-  H_ID="$1"; H_AGENTS=""; H_CMDS=""; H_SKILLS="skills"; H_FMT="none"; H_MODE="subagents"; H_INVOKE="/debate <ideia>"; H_MARK=""; H_EVID="docs"; H_DELEGATE=""
+  H_ID="$1"; H_AGENTS=""; H_CMDS=""; H_SKILLS="skills"; H_FMT="none"; H_MODE="subagents"; H_INVOKE="/debate <idea>"; H_MARK=""; H_EVID="docs"; H_DELEGATE=""
   case "$1" in
     opencode)
       H_NAME="opencode"; H_BINS="opencode"; H_USER="${XDG_CONFIG_HOME:-$HOME/.config}/opencode"; H_PROJ=".opencode"
-      H_AGENTS="agents"; H_CMDS="commands"; H_FMT="opencode"; H_MODE="native"; H_EVID="rodou" ;;
+      H_AGENTS="agents"; H_CMDS="commands"; H_FMT="opencode"; H_MODE="native"; H_EVID="ran" ;;
     claude)
       H_NAME="Claude Code"; H_BINS="claude"; H_USER="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"; H_PROJ=".claude"
-      H_AGENTS="agents"; H_FMT="claude"; H_MARK="$H_USER"; H_EVID="rodou"
+      H_AGENTS="agents"; H_FMT="claude"; H_MARK="$H_USER"; H_EVID="ran"
       H_DELEGATE="call the Agent tool with subagent_type set to the specialist's name." ;;
     codex)
       H_NAME="Codex CLI"; H_BINS="codex"; H_USER="$HOME"; H_PROJ="."
-      H_SKILLS=".agents/skills"; H_AGENTS=".codex/agents"; H_FMT="codex"; H_INVOKE="\$debate <ideia>"; H_MARK="$HOME/.codex"
+      H_SKILLS=".agents/skills"; H_AGENTS=".codex/agents"; H_FMT="codex"; H_INVOKE="\$debate <idea>"; H_MARK="$HOME/.codex"
       H_DELEGATE="spawn a subagent and name the specialist in your request, for example: have debate-arch do <task>." ;;
     cursor)
       H_NAME="Cursor"; H_BINS="cursor-agent agent"; H_USER="$HOME/.cursor"; H_PROJ=".cursor"
@@ -38,10 +38,10 @@ h_load() {
       H_NAME="Antigravity CLI"; H_BINS="agy"; H_USER="$HOME/.gemini/config"; H_PROJ=".agents"; H_MODE="cli" ;;
     omp)
       H_NAME="oh-my-pi"; H_BINS="omp"; H_USER="${PI_CODING_AGENT_DIR:-$HOME/.omp/agent}"; H_PROJ=".omp"
-      H_AGENTS="agents"; H_FMT="omp"; H_INVOKE="/skill:debate <ideia>"; H_MARK="$H_USER"; H_EVID="rodou"
+      H_AGENTS="agents"; H_FMT="omp"; H_INVOKE="/skill:debate <idea>"; H_MARK="$H_USER"; H_EVID="ran"
       H_DELEGATE="call the task tool with agent set to the specialist's name." ;;
     pi)
-      H_NAME="Pi"; H_BINS="pi"; H_USER="$HOME/.pi/agent"; H_PROJ=".pi"; H_MODE="cli"; H_INVOKE="/skill:debate <ideia>" ;;
+      H_NAME="Pi"; H_BINS="pi"; H_USER="$HOME/.pi/agent"; H_PROJ=".pi"; H_MODE="cli"; H_INVOKE="/skill:debate <idea>" ;;
     dsh)
       H_NAME="DeepSeek Harness"; H_BINS="dsh"; H_USER="${DSH_HOME:-$HOME/.dsh}"; H_PROJ=".dsh"; H_MODE="cli"; H_MARK="$H_USER" ;;
     droid)

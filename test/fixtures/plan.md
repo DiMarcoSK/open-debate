@@ -1,5 +1,5 @@
 # Plan fixture
 
-## 1. Stack e servicos
+## 1. Stack and services
 
 Cloud Run.
