@@ -383,7 +383,24 @@ t "timeout diz que foi timeout" tempo_esgotado
 t "binario ausente falha cedo" binario_ausente
 t "rerun nao sobrescreve spec editada" retoma_specs
 t "spec reprovada ganha reparo" spec_reparo
+em_dash() {
+  [ -x /bin/dash ] || return 0
+  S="$ROOT/template/skills/architect-debate/scripts"
+  cat > "$WORK/d.sh" <<EOF
+SCRIPT_DIR="$S"; TIMEOUT=1; HARNESS_CMD='echo saida'
+TO="perl -e alarm(shift);exec(@ARGV)||die 1"
+. "$S/harness.sh"
+h_run custom debate-pm oi "" "$WORK" "$WORK/d.raw" || exit 9
+[ "\$(cat "$WORK/d.raw")" = "saida" ] || exit 8
+HARNESS_CMD='sleep 5'; rc=0
+h_run custom debate-pm oi "" "$WORK" "$WORK/d.raw" || rc=\$?
+[ "\$rc" -eq 142 ] || exit 7
+EOF
+  /bin/dash "$WORK/d.sh" > "$WORK/d.saida" 2>&1
+  [ ! -s "$WORK/d.saida" ]
+}
 t "probe faz chamada pelo adapter" probe
+t "adapter grava em arquivo e calcula timeout sob dash" em_dash
 
 # --- instalador de uma linha, sem rede
 bootstrap() {

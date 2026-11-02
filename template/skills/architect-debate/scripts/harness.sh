@@ -21,12 +21,9 @@ persona() { awk 'c >= 2 { print } /^---$/ { c++ }' "$SCRIPT_DIR/../personas/$1.m
 
 h_prompt() { printf '%s\n\n## Tarefa\n\n%s\n' "$(persona "$1")" "$2"; }
 
-# h_run <harness> <agent> <tarefa> <modelo> <dir> <saida-bruta>; stderr vai para <saida-bruta>.stderr
-h_run() {
-  h="$1"; ag="$2"; ta="$3"; mo="$4"; di="$5"; ra="$6"
-  [ "$h" = "opencode" ] || ta="$(h_prompt "$ag" "$ta")"
-  # stdin fechado: varios CLIs esperam entrada por pipe e travam. O grupo externo cala o aviso do shell quando o alarme mata a chamada.
-  { (
+# h_chama: a chamada em si. stdin fechado, porque varios CLIs esperam entrada por pipe e travam.
+h_chama() {
+  (
     cd "$di"
     case "$h" in
       opencode)
@@ -81,7 +78,16 @@ h_run() {
       custom) PROMPT="$ta" MODEL="$mo" exec $TO sh -c "$HARNESS_CMD" ;;
       *) echo "harness desconhecido: $h" >&2; exit 2 ;;
     esac
-  ) < /dev/null > "$ra" 2> "$ra.stderr"; } 2>/dev/null
+  ) < /dev/null > "$ra" 2> "$ra.stderr"
+}
+
+# h_run <harness> <agent> <tarefa> <modelo> <dir> <saida-bruta>; stderr vai para <saida-bruta>.stderr
+# A chamada fica em funcao propria: em dash, redirecionar um grupo em volta do subshell descarta os redirecionamentos internos.
+# O 2>/dev/null aqui cala o aviso do shell quando o alarme do TIMEOUT mata a chamada.
+h_run() {
+  h="$1"; ag="$2"; ta="$3"; mo="$4"; di="$5"; ra="$6"
+  [ "$h" = "opencode" ] || ta="$(h_prompt "$ag" "$ta")"
+  h_chama 2>/dev/null
 }
 
 # h_texto <harness> <saida-bruta> <destino>: extrai a resposta final.
