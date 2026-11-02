@@ -1,6 +1,6 @@
 # open-debate
 
-[![CI](https://github.com/FelipeDiMarco/open-debate/actions/workflows/ci.yml/badge.svg)](https://github.com/FelipeDiMarco/open-debate/actions/workflows/ci.yml)
+[![CI](https://github.com/DiMarcoSK/open-debate/actions/workflows/ci.yml/badge.svg)](https://github.com/DiMarcoSK/open-debate/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 From a raw idea to a specified product, through a debate between agents, in the harness you already use.
@@ -24,15 +24,15 @@ The numbers above illustrate the output format. Agents and artifacts currently w
 ## Install
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/FelipeDiMarco/open-debate/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/DiMarcoSK/open-debate/main/install.sh | sh
 ```
 
-The installer puts the `open-debate` command in `~/.local/bin`, finds the harnesses on your machine and installs `/debate` in each one. Running it again updates. It requires macOS or Linux, `jq` and `perl`. On Windows, use WSL.
+The installer puts the `open-debate` command in `~/.local/bin`, finds the harnesses on your machine and installs `/debate` in each one. Running it again, or `open-debate upgrade`, updates. Every push to `main` that passes CI moves the `stable` tag; installed copies check it once a day and print a notice when a new version is out (`OPEN_DEBATE_NO_UPDATE_CHECK=1` turns it off). It requires macOS or Linux, `jq` and `perl`. On Windows, use WSL.
 
 With Node, without a global install:
 
 ```sh
-npx github:FelipeDiMarco/open-debate init
+npx github:DiMarcoSK/open-debate init
 ```
 
 Then open your harness and run `/debate <your idea>`. To check your setup:
@@ -185,7 +185,7 @@ Details in [`protocol.md`](template/skills/architect-debate/references/protocol.
 
 ## Customization
 
-**Models.** On opencode, `modelos.conf` sets 1 model per agent. The defaults are free models, which come and go from the catalog: run `open-debate models check` before a long debate. On other harnesses, the agent inherits the session model, and you can pin another on its `model` line. Your choice survives `update`.
+**Models.** On opencode, `modelos.conf` sets 1 model per agent, under a cost profile: `gratis` (default, free models only), `misto` (a stronger model only on the seats that decide: orchestrator, judge, auditor, architecture) and `forte` (the stronger model everywhere, most tokens). Switch with `open-debate models profile misto <provider/model>`, any id from `opencode models`. Free models come and go from the catalog: `update` swaps only the ones that left, to the `reserva` and then a different free model per agent, so the panel does not pile on one rate limit. `open-debate models check` shows the state. On other harnesses, the agent inherits the session model, and you can pin another on its `model` line. Your choice survives `update`.
 
 **Panel.** Three seats always sit: `debate-arch` (software architecture), `debate-ux` (UI and UX: usability goals, accessibility, the UI system and a review of every screen) and `debate-pm` (problem, metric, MVP cut, premises; it also writes the backlog). Research and judge always run outside the panel. The other seats join when the brief calls for them, up to 8 in total:
 

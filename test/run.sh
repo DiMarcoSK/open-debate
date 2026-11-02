@@ -85,9 +85,24 @@ t "init de novo nao muda nada" idempotente
 t "doctor passa" doctor_ok
 
 preserva_modelo() {
-  sed -i.bak 's/^model: .*/model: meu\/modelo-pago/' "$CFG/agents/debate-arch.md"; rm -f "$CFG/agents/debate-arch.md.bak"
+  sed -i.bak 's/^model: .*/model: opencode\/pago/' "$CFG/agents/debate-arch.md"; rm -f "$CFG/agents/debate-arch.md.bak"
   "$CLI" update
-  grep -q '^model: meu/modelo-pago$' "$CFG/agents/debate-arch.md"
+  grep -q '^model: opencode/pago$' "$CFG/agents/debate-arch.md"
+}
+update_repara_rotacao() {
+  sed -i.bak 's/^model: .*/model: opencode\/sumiu/' "$CFG/agents/debate-ux.md"; rm -f "$CFG/agents/debate-ux.md.bak"
+  "$CLI" update
+  grep -q '^model: opencode/gratis-' "$CFG/agents/debate-ux.md"
+  grep -q '^model: opencode/pago$' "$CFG/agents/debate-arch.md"
+}
+perfil_misto() {
+  nao "$CLI" models profile misto opencode/inexistente
+  "$CLI" models profile misto opencode/pago
+  grep -q '^model: opencode/pago$' "$CFG/agents/debate-judge.md"
+  grep -q '^model: opencode/gratis-' "$CFG/agents/debate-scout.md"
+  "$CLI" models check | grep -q '^perfil misto, forte=opencode/pago$'
+  "$CLI" models profile gratis
+  grep -q '^model: opencode/gratis-' "$CFG/agents/debate-judge.md"
 }
 protege_edicao() {
   echo extra >> "$CFG/agents/debate-pm.md"
@@ -108,6 +123,8 @@ preserva_conf() {
 }
 t "update preserva modelo escolhido" preserva_modelo
 t "update preserva modelos.conf" preserva_conf
+t "update troca so modelo que saiu do catalogo" update_repara_rotacao
+t "models profile misto e gratis" perfil_misto
 t "update recusa sobrescrever edicao" protege_edicao
 t "update --force faz backup" force_faz_backup
 
@@ -827,6 +844,8 @@ bootstrap() {
   [ "$("$WORK/od-bin/open-debate" --version)" = "$(jq -r .version "$ROOT/package.json")" ]
 }
 tp "install.sh instala e reinstala" bootstrap
+upgrade_sem_ref() { nao "$CLI" upgrade --check 2>/dev/null; }
+tp "upgrade recusa instalacao sem install.sh" upgrade_sem_ref
 
 # --- execucao. Os testes `t` mexem na instalacao: rodam em ordem, num job so do pool, com HOME proprio.
 # Os `tp` dividem o HOME principal, onde o opencode e instalado 1 vez antes, e so o leem.

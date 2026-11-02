@@ -8,9 +8,19 @@ Estado do caso em `references/protocol.md`. Scripts em `{{SCRIPTS}}/` (abaixo, `
 
 ## Modo sessao (padrao: /debate; um especialista por subagent)
 
-Fase 0, intake, 1 rodada com ate 6 perguntas, cada uma com 2-4 opcoes e default:
+Antes do intake: se `open-debate` estiver no PATH, rode `open-debate upgrade --check` e, havendo versao nova, diga em 1 linha.
+
+Fase 0, intake em modo grill: o produto final so e conciso se o brief for. Pergunte em rodadas, 1 tema por rodada,
+ate 3 perguntas por rodada, cada uma com 2-4 opcoes e a sua recomendacao marcada como default. Temas, nesta ordem:
 1. objetivo, quem usa, metrica de sucesso em 90 dias; 2. carga (usuarios, req/dia, pico); 3. prazo, time, custo teto/mes;
 4. drivers de qualidade top 3; 5. dados sensiveis e regulacao; 6. plataforma, concorrentes e referencias visuais.
+Grill, a cada resposta:
+- Vaga ("todo mundo", "rapido", "barato", "escalavel") volta como pergunta com numero ou exemplo: "quantos?", "em quanto tempo?", "ate quanto/mes?".
+- Contradicao entre respostas (prazo de 4 semanas com 9 features; custo zero com SLA 99,99) e apontada e o usuario escolhe o que cede.
+- Corte de escopo: liste as features citadas e peca o MVP: o que entra no dia 1, o que vai para depois, o que sai. Pergunte "se so desse para lancar 1 fluxo, qual?".
+- Pergunte o porque de cada requisito duro ate chegar na restricao real; requisito sem dono vira hipotese.
+- Encerra o grill quando objetivo, metrica, usuario principal, MVP, prazo e teto de custo tem resposta concreta, ou quando o usuario pedir para seguir (teto 5 rodadas).
+Antes de seguir, mostre o brief em 6 linhas (problema, usuario, metrica, MVP, fora do escopo, restricoes) e peca confirmacao.
 Sem resposta: assume e marca `[assumido, dono <nome>, <semana>]`. Roda `$S/new-debate.sh "<ideia>" <dest>` (dest default `cases` na raiz do projeto), preenche `brief.md`, ajusta `constitution.md`, roda `$S/gate.sh <caso> brief` ate passar.
 Painel: `debate-arch`, `debate-ux` e `debate-pm` sentam sempre. Os opcionais saem do brief: rode `$S/painel.sh <caso>`, que mostra o painel e a palavra do brief que acionou cada assento (catalogo em `references/painel.conf`):
 
@@ -33,7 +43,7 @@ Fases 1-6, cada linha e 1 leva de Task. `le` e `escreve` vao no prompt do Task, 
 | Fase | Subagent(s), em paralelo | Le | Escreve | Gate |
 |---|---|---|---|---|
 | 1 pesquisa | debate-research (abre debate-scout por pergunta) | brief.md, research-template.md | research.md | `gate.sh <caso> pesquisa` |
-| 1b agenda | debate-judge, `fase agenda`, com o painel no prompt | brief.md, constitution.md, research.md, agenda-template.md | agenda.md | `gate.sh <caso> agenda` |
+| 1b agenda | debate-judge, `fase agenda`, com o painel no prompt | brief.md, constitution.md, research.md, agenda-template.md | agenda.md | `gate.sh <caso> agenda`; depois, grill 2: as decisoes da agenda que dependem de preferencia do usuario (e nao de evidencia) viram ate 3 perguntas com default; a resposta entra em brief.md antes da proposta |
 | 2 proposta | painel inteiro | brief.md, constitution.md, research.md, agenda.md, regras-debate.md, visual-contract.md (design, ux, brand) | proposals/<agent>.md | `gate.sh <caso> proposta` |
 | 3 ataque | painel inteiro | brief.md, research.md, agenda.md, regras-debate.md, propostas rivais | critiques/<agent>.md | `gate.sh <caso> ataque` |
 | 4 fact-check | debate-research, `modo fact-check` | proposals/, critiques/, research-template.md | research-check.md | nao bloqueia |

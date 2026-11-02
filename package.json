@@ -20,10 +20,10 @@
     "spec-driven-development"
   ],
   "license": "MIT",
-  "homepage": "https://github.com/FelipeDiMarco/open-debate",
+  "homepage": "https://github.com/DiMarcoSK/open-debate",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/FelipeDiMarco/open-debate.git"
+    "url": "git+https://github.com/DiMarcoSK/open-debate.git"
   },
   "bin": {
     "open-debate": "bin/open-debate"

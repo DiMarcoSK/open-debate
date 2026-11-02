@@ -21,3 +21,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: sh test/run.sh
+
+  # Cada push na main que passa no lint e nos testes vira a versao estavel: install.sh e `open-debate upgrade`
+  # baixam a tag stable, e quem tem instalado recebe o aviso de versao nova em ate 1 dia.
+  stable:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          git tag -f stable "$GITHUB_SHA"
+          git push -f origin refs/tags/stable

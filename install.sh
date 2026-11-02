@@ -1,13 +1,13 @@
 #!/bin/sh
 # install.sh - instala o open-debate sem npm.
-#   curl -fsSL https://raw.githubusercontent.com/FelipeDiMarco/open-debate/main/install.sh | sh
-# Env: OPEN_DEBATE_REF=main (tag ou branch), OPEN_DEBATE_HOME, OPEN_DEBATE_BIN, OPEN_DEBATE_NO_INIT=1.
+#   curl -fsSL https://raw.githubusercontent.com/DiMarcoSK/open-debate/main/install.sh | sh
+# Env: OPEN_DEBATE_REF=stable (tag ou branch; stable = ultimo push na main que passou no CI), OPEN_DEBATE_HOME, OPEN_DEBATE_BIN, OPEN_DEBATE_NO_INIT=1.
 # Baixa o pacote para ~/.local/share/open-debate, liga o comando em ~/.local/bin e instala nos harnesses detectados.
 # Rodar de novo atualiza.
 set -eu
 
-REPO="FelipeDiMarco/open-debate"
-REF="${OPEN_DEBATE_REF:-main}"
+REPO="DiMarcoSK/open-debate"
+REF="${OPEN_DEBATE_REF:-}"
 DEST="${OPEN_DEBATE_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/open-debate}"
 BIN="${OPEN_DEBATE_BIN:-$HOME/.local/bin}"
 
@@ -34,14 +34,25 @@ trap 'rm -rf "$tmp"' EXIT
 if [ -n "${OPEN_DEBATE_TARBALL:-}" ]; then
   cp "$OPEN_DEBATE_TARBALL" "$tmp/p.tgz"
 else
-  url="https://codeload.github.com/$REPO/tar.gz/$REF"
-  if command -v curl >/dev/null 2>&1; then curl -fsSL "$url" -o "$tmp/p.tgz"
-  elif command -v wget >/dev/null 2>&1; then wget -qO "$tmp/p.tgz" "$url"
-  else erro "curl ou wget nao encontrado"; fi
+  baixa() { # baixa <url> <saida> [header]
+    if command -v curl >/dev/null 2>&1; then curl -fsSL ${3:+-H "$3"} "$1" -o "$2"
+    elif command -v wget >/dev/null 2>&1; then wget -qO "$2" ${3:+--header="$3"} "$1"
+    else erro "curl ou wget nao encontrado"; fi
+  }
+  # Fixa o sha antes de baixar: o tarball e o aviso de atualizacao falam do mesmo commit. Sem a tag stable, usa a main.
+  for r in ${REF:-stable main}; do
+    if baixa "https://api.github.com/repos/$REPO/commits/$r" "$tmp/sha" 'Accept: application/vnd.github.sha' 2>/dev/null; then REF="$r"; break; fi
+  done
+  SHA="$(cat "$tmp/sha" 2>/dev/null || true)"
+  [ -n "$SHA" ] || erro "ref nao encontrada: ${REF:-stable}"
+  baixa "https://codeload.github.com/$REPO/tar.gz/$SHA" "$tmp/p.tgz"
 fi
 mkdir "$tmp/p"
 tar -xzf "$tmp/p.tgz" -C "$tmp/p" --strip-components=1
 [ -x "$tmp/p/bin/open-debate" ] || erro "pacote invalido em $REF"
+
+[ -z "${SHA:-}" ] || printf '%s %s\n' "$REF" "$SHA" > "$tmp/p/.open-debate-ref"
+existia=0; [ -e "$DEST" ] && existia=1
 
 # Troca so depois de validar: falha no download nao destroi a versao instalada.
 mkdir -p "$(dirname "$DEST")" "$BIN"
@@ -53,7 +64,9 @@ ln -sf "$DEST/bin/open-debate" "$BIN/open-debate"
 printf 'open-debate %s em %s\n' "$("$BIN/open-debate" --version)" "$DEST"
 
 if [ "${OPEN_DEBATE_NO_INIT:-0}" != "1" ]; then
-  "$BIN/open-debate" init --yes || printf 'aviso: nenhum harness configurado agora. Depois rode: open-debate init\n' >&2
+  # Reinstalar atualiza o que ja esta instalado, preservando modelos e edicoes; 1a vez instala nos detectados.
+  if [ "$existia" = "1" ]; then "$BIN/open-debate" update || printf 'aviso: update parcial, veja acima (open-debate update --force faz backup e sobrescreve)\n' >&2
+  else "$BIN/open-debate" init --yes || printf 'aviso: nenhum harness configurado agora. Depois rode: open-debate init\n' >&2; fi
 fi
 
 case ":$PATH:" in

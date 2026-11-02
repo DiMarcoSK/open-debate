@@ -2,7 +2,7 @@
 
 ## Reporting a vulnerability
 
-Use a [private GitHub advisory](https://github.com/FelipeDiMarco/open-debate/security/advisories/new). Do not open a public issue.
+Use a [private GitHub advisory](https://github.com/DiMarcoSK/open-debate/security/advisories/new). Do not open a public issue.
 
 ## Threat model
 

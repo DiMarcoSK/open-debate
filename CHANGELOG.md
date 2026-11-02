@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Model cost profiles on opencode: `open-debate models profile gratis|misto|forte [provider/model]`. `misto` puts the strong model only on the orchestrator, judge, auditor and architecture seats.
+- `open-debate upgrade [--check]` and a daily new-version notice. CI moves the `stable` tag on every green push to `main`; `install.sh` pins the downloaded commit.
+- Grill intake: rounds of up to 3 questions per theme that challenge vague answers, contradictions and scope, plus a second grill after the agenda for preference-only decisions.
+
+### Changed
+
+- `update` swaps only the opencode models that left the catalog, spreading replacements across free models.
+- Reinstalling via `install.sh` runs `update` instead of `init`. Repo slug fixed to `DiMarcoSK/open-debate`.
+
 ## 0.4.0
 
 A panel picked for the idea, with a fixed core and a design trio that hands work to each other.

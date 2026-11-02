@@ -206,8 +206,10 @@ do_install() {
   rm -rf "$tmp"
 
   echo "open-debate $(version) em $TARGET: $n_add novo(s), $n_upd atualizado(s), $(printf '%s' "$conflitos" | wc -w | tr -d ' ') sobrescrito(s)"
-  if [ "$H_ID" = "opencode" ] && command -v opencode >/dev/null 2>&1 && [ "$novo" = "1" ] && [ -z "$conflitos" ]; then
-    "$TARGET/$H_SKILLS/$SKILL/scripts/modelos.sh" aplicar || echo "aviso: modelos nao aplicados, rode: open-debate models apply"
+  # Instalacao nova grava o perfil; update so troca o modelo que saiu do catalogo (rotacao dos gratuitos).
+  if [ "$H_ID" = "opencode" ] && command -v opencode >/dev/null 2>&1 && [ -z "$conflitos" ]; then
+    acao=reparar; [ "$novo" = "1" ] && acao=aplicar
+    "$TARGET/$H_SKILLS/$SKILL/scripts/modelos.sh" "$acao" > /dev/null || echo "aviso: modelos nao aplicados, rode: open-debate models apply"
   fi
   [ "$modo" = "init" ] && printf 'pronto em %s: %s\n' "$H_NAME" "$H_INVOKE"
   return 0
@@ -280,11 +282,12 @@ do_models() {
   resolve_target opencode
   [ -f "$MANIFEST" ] || { echo "erro: models so se aplica ao opencode, e nada esta instalado em $TARGET" >&2; exit 2; }
   m="$TARGET/$H_SKILLS/$SKILL/scripts/modelos.sh"
-  case "$1" in
+  case "${1:-check}" in
     check|livres) exec "$m" "$1" ;;
     free) exec "$m" livres ;;
     apply) exec "$m" aplicar ;;
-    *) echo "uso: open-debate models check|apply|free" >&2; exit 2 ;;
+    profile) shift; exec "$m" perfil "$@" ;;
+    *) echo "uso: open-debate models check|apply|free|profile <gratis|misto|forte> [provider/modelo]" >&2; exit 2 ;;
   esac
 }
 

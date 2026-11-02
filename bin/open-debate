@@ -28,6 +28,8 @@ Instalação:
   open-debate doctor [--live] [opções]      confere dependências, instalação e, com --live, faz 1 chamada real
   open-debate harnesses                     lista harnesses suportados e o estado de cada um
   open-debate models [check|apply|free]     modelos do opencode
+  open-debate models profile <p> [modelo]   perfil de custo: gratis | misto (forte so em quem decide) | forte
+  open-debate upgrade [--check]             baixa a versao estavel mais nova e atualiza os harnesses
 
   Opções: --harness a,b  --all  --project  --force  --yes
 
@@ -51,6 +53,40 @@ mobile, gcp, aws, k8s (references/painel.conf).
 --from arquiva a fase e as seguintes em raw/arquivo e refaz: pesquisa agenda proposta ataque factcheck replica decisao sdd marca specs backlog.
 Env do run: MODEL, MODEL_FALLBACK, HARNESS, HARNESS_CMD, ROTAS, MESA, PAINEL, RETRIES, TIMEOUT, BACKOFF, PARALELO, MAX_CHAMADAS, RESEARCH, AGENDA, FACTCHECK, SPECS, REVIEW, REPAIR, FRESH.
 EOF
+}
+
+# Atualizacao: install.sh grava em $ROOT/.open-debate-ref "<ref> <sha>". O CI move a tag `stable` para cada push
+# na main que passa nos testes; o aviso compara o sha local com o da ref, 1x por dia, sem travar o comando.
+REF_FILE="$ROOT/.open-debate-ref"
+REPO="DiMarcoSK/open-debate"
+sha_remoto() {
+  command -v curl >/dev/null 2>&1 || return 1
+  curl -fsS -m 3 -H 'Accept: application/vnd.github.sha' "https://api.github.com/repos/$REPO/commits/$1" 2>/dev/null
+}
+novidade() { # imprime a msg e retorna 0 quando ha versao nova
+  [ -f "$REF_FILE" ] || return 1
+  read -r ref sha < "$REF_FILE" || return 1
+  r="$(sha_remoto "$ref")" || return 1
+  [ -n "$r" ] && [ "$r" != "$sha" ] || return 1
+  printf 'open-debate: nova versao em %s (%s), rode: open-debate upgrade\n' "$ref" "$(printf '%s' "$r" | cut -c1-7)"
+}
+aviso_diario() {
+  [ -f "$REF_FILE" ] && [ -z "${OPEN_DEBATE_NO_UPDATE_CHECK:-}" ] && [ -t 2 ] || return 0
+  marca="$ROOT/.open-debate-check"
+  [ -z "$(find "$marca" -mtime -1 2>/dev/null)" ] || return 0
+  : > "$marca" 2>/dev/null || return 0
+  novidade >&2 || true
+}
+cmd_upgrade() {
+  if [ ! -f "$REF_FILE" ]; then
+    echo "erro: instalado sem install.sh; atualize por onde instalou (npm update -g open-debate ou git pull) e rode: open-debate update" >&2; exit 2
+  fi
+  if [ "${1:-}" = "--check" ]; then novidade || echo "open-debate $(version) esta em dia"; return 0; fi
+  read -r ref sha < "$REF_FILE"
+  # Copia o instalador: ele troca $ROOT inteiro enquanto roda.
+  t="$(mktemp)"; cp "$ROOT/install.sh" "$t"
+  OPEN_DEBATE_HOME="$ROOT" OPEN_DEBATE_REF="$ref" sh "$t"; rc=$?
+  rm -f "$t"; return "$rc"
 }
 
 run_script() {
@@ -149,7 +185,9 @@ cmd_run() {
 
 cmd="${1:-help}"
 [ "$#" -eq 0 ] || shift
+case "$cmd" in -h|--help|help|-v|--version|version|upgrade) ;; *) aviso_diario ;; esac
 case "$cmd" in
+  upgrade) cmd_upgrade "$@" ;;
   -h|--help|help) usage ;;
   -v|--version|version) version ;;
   init|update|uninstall|doctor|models|harnesses)
@@ -164,7 +202,7 @@ case "$cmd" in
         --harness) [ "$#" -ge 2 ] || { echo "erro: --harness pede uma lista" >&2; exit 2; }; ESCOLHA="$(csv "$2")"; shift ;;
         --harness=*) ESCOLHA="$(csv "${1#--harness=}")" ;;
         -*) echo "erro: opcao desconhecida: $1" >&2; exit 2 ;;
-        *) ARG="$1" ;;
+        *) ARG="${ARG:+$ARG }$1" ;;
       esac
       shift
     done
@@ -184,7 +222,7 @@ case "$cmd" in
           for h in $(instalados); do h_load "$h"; if h_bin >/dev/null; then "$PKG_SCRIPTS/probe.sh" "$h" || rc=1; fi; done
         fi
         exit "$rc" ;;
-      models) do_models "${ARG:-check}" ;;
+      models) do_models ${ARG:-check} ;;
       harnesses) do_harnesses ;;
     esac ;;
   new) need_args "$#" 1; run_script new-debate.sh "$@" ;;
