@@ -19,22 +19,15 @@ B="$CASE_DIR/brief.md"
 for n in $(awk '/^- [^:]*:[[:space:]]*$/ { print NR }' "$B"); do say "$B" "$n" "campo vazio no brief"; done
 [ "${2:-}" = "--brief" ] && fim
 
-banidos() {
-  for b in 'roxo-azul' 'gradiente roxo' 'glass card' 'glassmorphism' 'lorem ipsum' 'corporate memphis' 'parede de texto' 'carousel' 'carrossel'; do
-    hit="$(grep -in -- "$b" "$1" | grep -vi 'sem \|banid\|veto\|ausente\|override\|evit\|nao \|proib\|lista' | head -1 || true)"
-    if [ -n "$hit" ] && ! has "$1" 'override'; then say "$1" "${hit%%:*}" "visual banido ($b) sem override escrito"; fi
-  done
-}
-
 PAINEL="$(sed -n 's/^painel: //p' "$CASE_DIR/meta.txt" 2>/dev/null | tail -1)"
 PAINEL="${PAINEL:-debate-arch debate-design debate-gcp debate-k8s}"
 
 gate pesquisa debate-research "$CASE_DIR/research.md"
+[ ! -f "$CASE_DIR/agenda.md" ] || gate agenda debate-judge "$CASE_DIR/agenda.md"
 for a in $PAINEL; do
   gate proposta "$a" "$CASE_DIR/proposals/$a.md"
   [ -f "$CASE_DIR/critiques/$a.md" ] && gate ataque "$a" "$CASE_DIR/critiques/$a.md"
 done
-[ -f "$CASE_DIR/proposals/debate-design.md" ] && banidos "$CASE_DIR/proposals/debate-design.md"
 
 gate decisao debate-judge "$CASE_DIR/decision.md"
 if [ -s "$CASE_DIR/decision.md" ] && ! ls "$CASE_DIR"/adr/[0-9]*.md >/dev/null 2>&1; then
@@ -43,23 +36,19 @@ fi
 
 S="$CASE_DIR/SDD.md"
 gate sdd debate-judge "$S"
-[ -s "$S" ] && banidos "$S"
+[ ! -f "$CASE_DIR/auditoria.md" ] || gate auditoria debate-auditor "$CASE_DIR/auditoria.md"
 
 for d in "$CASE_DIR"/specs/*/; do
   [ -d "$d" ] || continue
-  for f in spec.md plan.md tasks.md; do
-    [ -s "$d$f" ] || { say "$d$f" 0 "arquivo ausente ou vazio"; continue; }
-    if grep -q '<nn>\|<slug>\|<quem>\|<evento>\|ADR-NNNN' "$d$f"; then say "$d$f" 0 "template nao preenchido"; fi
-  done
-  [ -s "${d}spec.md" ] && ! grep -q 'ADR-[0-9]' "${d}spec.md" && say "${d}spec.md" 0 "spec sem ADR citado"
+  gate spec - "${d%/}"
   b="$(basename "$d")"
   [ -f "$CASE_DIR/checklists/requirements-$b.md" ] || say "$CASE_DIR/checklists/requirements-$b.md" 0 "checklist ausente"
 done
 
 if [ -s "$CASE_DIR/BACKLOG.md" ]; then gate backlog debate-pm "$CASE_DIR/BACKLOG.md"; fi
 
-grep -rn '\[assumido' "$CASE_DIR" --include='*.md' --exclude='*-template.md' --exclude='regras-debate.md' --exclude='visual-contract.md' --exclude='lapidacao.md' 2>/dev/null \
-  | grep -vi 'dono' > "$CASE_DIR/.assumido.tmp" || true
+grep -rn '\[assumido' "$CASE_DIR" --include='*.md' --exclude='*-template.md' --exclude='regras-debate.md' --exclude='visual-contract.md' --exclude='lapidacao.md' --exclude-dir=raw 2>/dev/null \
+  | grep -vi 'dono' | grep -v '`\[assumido' > "$CASE_DIR/.assumido.tmp" || true
 if [ -s "$CASE_DIR/.assumido.tmp" ]; then
   while IFS= read -r l; do printf 'assumido-sem-dono: %s\n' "$l"; done < "$CASE_DIR/.assumido.tmp"; FAIL=1
 fi

@@ -1,5 +1,44 @@
 # Changelog
 
+## 0.3.0
+
+Better planning, sharper specialists, gates that verify instead of trusting, and a faster run.
+
+### Added
+
+- Phase 1b, `agenda.md`: the judge lists the 3-8 decisions in dispute before any proposal. Every proposal takes a position on each one and the decision must close each one. `AGENDA=0` skips it. Older cases with proposals keep working.
+- `debate-sec`, an optional panel seat for threat model, authorization, LGPD and PCI duties and audit trail. `run` suggests it when the brief declares regulated data.
+- `debate-auditor`, an independent review of the SDD. It returns a verdict and a list of provable defects, and the judge corrects only those.
+- `open-debate status <case>`: each phase, the next one, stale outputs, calls and model time.
+- `open-debate run --from <phase>`: archives that phase and the later ones in `raw/arquivo` and redoes them.
+- `raw/metricas.tsv`: time, attempts and outcome per call, with a summary at the end of the run.
+- `PARALELO` limits simultaneous calls and `MAX_CHAMADAS` limits calls per run.
+
+### Changed
+
+- Gates now verify what they used to take on trust. Attack quotes must exist in the cited file. Finding ids must exist in `research.md`. Weights must total 100, and each matrix total is recomputed. Every veto and every claim the fact-check marked wrong needs a ruling. The SDD must list every ADR and carry the decision's tokens unchanged. Specs must use EARS, cite existing ADRs and have tasks for every user story. The backlog must cover every spec task and fit the capacity, which the gate recomputes. Each output has a line ceiling, with 50% tolerance.
+- From the command line, proposals and attacks run in a working directory holding only what the agent may read, so parallel calls and repairs cannot read a rival's output.
+- `debate-gcp` and `debate-k8s` were rewritten with their own method and format: load and quota math for GCP, a break-even verdict on running a cluster at all for Kubernetes. Every specialist now states what it owns and what it does not.
+- Rebuttal runs only for agents that received a veto, which saves those calls.
+- The audit replaces the judge's full rewrite of the SDD. A clean SDD is no longer re-emitted.
+- On Claude Code, `debate-scout` uses Haiku: scouts answer one factual question each, and research spends most of its time on them.
+- Installing is about 2 times faster: files without placeholders are copied in bulk, and hashing no longer starts a perl process per file on macOS.
+- The test suite runs the harness matrix in parallel.
+
+### Fixed
+
+- The capacity formula left out days per week: `devs x weeks x 0.7` was reported as days. It is now `devs x weeks x 5 x 0.7`.
+- From the command line, agents tried to write the file themselves, got a permission denial and answered with a request for access, which became the output. The task now says the final answer is the file's content.
+- A rate limit was treated as a login failure, so a 429 ended the run. It now waits with exponential backoff and jitter. Login and quota failures still stop at once.
+- Words like "rate limit" inside an agent's answer could be misread as a provider error. Only the end of the failed output is inspected now.
+- `Ctrl-C` and `TERM` waited for the running call to finish and left parallel calls running. They now end every call in flight.
+- Two runs on the same case overwrote each other. The second is now refused, and a lock left by a dead run is reclaimed.
+- Banned visuals were only caught by `validate`, at the end. They now fail at the phase, where they get a repair.
+
+### Migration
+
+Run `open-debate update`. Existing cases resume normally: without `agenda.md`, a case with proposals skips the agenda. Backlog gates are stricter, so an older `BACKLOG.md` may need the new `Capacidade` line. The `fase revisao` task is now `fase correcao`.
+
 ## 0.2.0
 
 open-debate no longer depends on opencode.

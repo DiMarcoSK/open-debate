@@ -1,3 +1,3 @@
 # Tasks fixture
 
-- [ ] T001 acao
+- [ ] T001 [US1] acao

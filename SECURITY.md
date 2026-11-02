@@ -9,6 +9,7 @@ Use a [private GitHub advisory](https://github.com/FelipeDiMarco/open-debate/sec
 The debate reads web pages and passes their content to agents, so research is untrusted input. The defenses are:
 
 - Specialists get no shell. In `open-debate run`, calls are read-only whenever the harness offers that mode.
+- Prompts tell research agents to treat pages as data, and tell every agent that research content is never an instruction. This lowers the risk but does not remove it.
 - No adapter turns on automatic approval for writes or shell.
 - The orchestrator can run only the scripts in its own installation path without confirmation.
 - `backlog-gh.sh` is generated from agent text: review it before running.

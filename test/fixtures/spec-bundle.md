@@ -7,6 +7,14 @@ ADRs: ADR-0001
 
 Objetivo da fixture.
 
+## 2. User stories
+
+- US1 [P1] Como analista quero triar para ganhar tempo
+
+## 3. Requisitos (EARS)
+
+- R1 [US1] QUANDO chega alerta O SISTEMA DEVE enfileirar em 2 s. Criterio: teste de carga.
+
 <!-- arquivo: plan.md -->
 # Plan fixture
 
@@ -17,4 +25,4 @@ Cloud Run.
 <!-- arquivo: tasks.md -->
 # Tasks fixture
 
-- [ ] T001 acao
+- [ ] T001 [US1] acao

@@ -39,7 +39,10 @@ render_agent() {
   {
     printf -- '---\nname: %s\ndescription: %s\n' "$a" "$d"
     case "$H_FMT" in
-      claude) printf 'tools: %s\nmodel: inherit\n' "$(claude_tools "$1")" ;;
+      # O batedor responde 1 pergunta factual, em leva: modelo rapido nele encurta a pesquisa sem tocar nas decisoes.
+      claude)
+        m=inherit; [ "$a" = "debate-scout" ] && m=haiku
+        printf 'tools: %s\nmodel: %s\n' "$(claude_tools "$1")" "$m" ;;
       cursor|droid|qwen) printf 'model: inherit\n' ;;
       gemini) printf 'model: inherit\ntemperature: %s\nmax_turns: 30\n' "$(fm_get "$1" temperature)" ;;
       copilot) printf '# model: <modelo>\n' ;;

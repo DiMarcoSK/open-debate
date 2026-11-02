@@ -1,11 +1,12 @@
 # Backlog - <produto>
 
 Fonte: SDD.md, decision.md, adr/, specs/, lapidacao.md. `[P]` bloqueia a fase seguinte. Estimativa P (ate 1 dia), M (2-3 dias), G (4-5 dias); maior que G quebra em 2.
-Capacidade: <devs> x <semanas> x 0.7 de foco = <dias uteis>; backlog soma <dias>; <cabe | corta para Pos-lancamento: B..>.
+Capacidade: <devs> x <semanas> x 5 x 0.7 = <N> dias uteis; backlog soma <M> dias; <cabe | corta para Pos-lancamento: B..>.
+A linha acima e conferida pelo gate: M e a soma dos itens antes de Pos-lancamento (P=1, M=2.5, G=4.5) e precisa caber em N.
 
 ## Formato do item (gate.sh le)
 
-`- [ ] Bnn [P] <acao com verbo, fatia vertical>. Aceite: <criterio testavel com numero> (spec NN:Txxx | ADR-NNNN | SDD-n) {Enn, est P|M|G, dep Bxx Byy, #tag #tag}`
+`- [ ] Bnn [P] <acao com verbo, fatia vertical>. Aceite: <criterio testavel com numero> (spec NN:Txxx,Tyyy | spec NN:Txxx-Tyyy | ADR-NNNN | SDD-n) {Enn, est P|M|G, dep Bxx Byy, #tag #tag}`
 
 Status de execucao vai depois, entre colchetes: `[x]` + `[verificado AAAA-MM-DD: como]`.
 

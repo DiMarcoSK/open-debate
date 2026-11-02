@@ -1,6 +1,6 @@
 # Backlog - Fixture
 
-Capacidade: 2 x 8 x 0.7 = 78 dias uteis; backlog soma 30; cabe.
+Capacidade: 2 x 8 x 5 x 0.7 = 56 dias uteis; backlog soma 29 dias; cabe.
 
 ## Fase 0 - Fundacao (semana 1)
 

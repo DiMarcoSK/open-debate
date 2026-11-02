@@ -108,5 +108,9 @@ h_texto() {
   [ -s "$3" ]
 }
 
-# Ultima palavra sobre "acabou a cota ou a sessao": cada harness escreve de um jeito.
-h_auth_falhou() { grep -qiE 'FreeTierError|Free usage limit|statusCode[^0-9]*40[13]|unauthorized|not logged in|please log ?in|invalid api key|usage limit|rate limit' "$1" "$1.stderr" 2>/dev/null; }
+# h_falha <saida-bruta>: o que resta da saida depois de uma chamada que falhou. So o fim: uma proposta pode falar de rate limit.
+h_falha() { { tail -c 2000 "$1" 2>/dev/null; tail -c 2000 "$1.stderr" 2>/dev/null; } | tr -d '\000'; }
+# Falha permanente: tentar de novo so gasta tempo. Cada harness escreve de um jeito.
+h_auth_falhou() { h_falha "$1" | grep -qiE 'FreeTierError|Free usage limit|statusCode[^0-9]*40[13]|unauthorized|not logged in|please log ?in|invalid api key|usage limit'; }
+# Falha passageira: passa com espera.
+h_limite_falhou() { h_falha "$1" | grep -qiE '(^|[^0-9])429([^0-9]|$)|rate.?limit|too many requests|overloaded|resource.?exhausted|try again'; }

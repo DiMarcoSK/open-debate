@@ -65,6 +65,10 @@ open-debate run <case> --harness claude --mesa claude,codex,gemini
 ROTAS="debate-arch=claude debate-design=codex:<model>" open-debate run <case> --harness claude
 ```
 
+On Claude Code, `debate-scout` is installed with `model: haiku` and the other agents inherit the session model. Change that line to pick another one; `update` keeps your choice.
+
+Parallel calls hit provider limits together. If a run keeps waiting on limits, lower `PARALELO`.
+
 ## Other CLIs
 
 Any CLI with a headless mode works with no code changes. The command receives `$PROMPT` and `$MODEL`, and whatever it prints becomes the answer:

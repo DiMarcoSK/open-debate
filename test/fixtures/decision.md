@@ -3,6 +3,29 @@
 ## 1. Pesos
 velocidade=40 custo=30 prazo=30
 
+## 2. Placar
+
+### D1 Monolito ou servicos
+
+| Opcao | velocidade | custo | prazo | Total |
+|---|---|---|---|---|
+| Monolito | 4 | 4 | 5 | 430 |
+| Servicos | 3 | 2 | 4 | 300 |
+
+### D2 Direcao visual
+
+| Opcao | velocidade | custo | prazo | Total |
+|---|---|---|---|---|
+| Densa | 5 | 3 | 3 | 380 |
+| Leve | 3 | 3 | 3 | 300 |
+
+### D3 Banco
+
+| Opcao | velocidade | custo | prazo | Total |
+|---|---|---|---|---|
+| Cloud SQL | 4 | 4 | 4 | 400 |
+| Firestore | 4 | 3 | 3 | 340 |
+
 ## 3. ADRs
 
 ## ADR-0001 Usar monolito modular
@@ -101,3 +124,12 @@ nenhum
 ## 8. Dissenso
 
 debate-k8s: portabilidade; reabre se > 10 servicos
+
+## 9. Vetos
+
+| Alvo | Veto | Resultado | Motivo |
+|---|---|---|---|
+| debate-gcp | budget | mantido | custo |
+| debate-gcp | budget | mantido | custo |
+| debate-design | budget | rejeitado | fora do papel |
+| debate-arch | budget | rejeitado | fora do papel |

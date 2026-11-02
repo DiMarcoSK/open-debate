@@ -1,5 +1,5 @@
 # backlog.awk - le itens de BACKLOG.md no formato de backlog-template.md.
-# modo=check: imprime "FALHA <motivo>" por problema, sai 1. Vars: tags, specs, adrs (listas separadas por espaco).
+# modo=check: imprime "FALHA <motivo>" por problema, sai 1. Vars: tags, specs, adrs, tarefas (listas separadas por espaco; tarefa = NN:Txxx).
 # modo=tsv: 1 linha por item (id fase epico titulo aceite origem est dias deps tags bloqueia status).
 # modo=resumo: itens e dias por fase, total e caminho critico pelas dependencias.
 function dias(e) { return e == "P" ? 1 : e == "M" ? 2.5 : e == "G" ? 4.5 : 0 }
@@ -11,6 +11,18 @@ function caminho(id,  n, i, d, v, melhor, ds) {
   n = split(dep[id], ds, " ")
   for (i = 1; i <= n; i++) { d = ds[i]; if (!(d in fase)) continue; v = caminho(d); if (v > melhor) { melhor = v; prev[id] = d } }
   estado[id] = 2; total[id] = melhor + dias(est[id]); return total[id]
+}
+# Capacidade: <devs> x <semanas> x 5 x 0.7 = <N> dias uteis; backlog soma <M> dias
+/^[^|]*Capacidade:/ && cap == "" {
+  l = $0; sub(/^.*Capacidade:/, "", l)
+  if (match(l, /=[[:space:]]*[0-9]+([.,][0-9]+)?/)) {
+    x = substr(l, RSTART + 1, RLENGTH - 1); gsub(/[[:space:]]/, "", x); gsub(/,/, ".", x); cap = x + 0
+    c = substr(l, 1, RSTART - 1); k = split(c, ws, /[[:space:]]*[xX*][[:space:]]*/); pr = 1; contavel = (k >= 3)
+    for (i = 1; i <= k; i++) { y = ws[i]; gsub(/[[:space:]]/, "", y); if (y !~ /^[0-9]+([.][0-9]+)?$/) contavel = 0; else pr *= y }
+    if (contavel) capconta = pr
+  }
+  if (match(l, /soma[[:space:]]*[0-9]+([.,][0-9]+)?/)) { x = substr(l, RSTART + 4, RLENGTH - 4); gsub(/[[:space:]]/, "", x); gsub(/,/, ".", x); soma = x + 0 }
+  next
 }
 /^##[[:space:]]+Fase[[:space:]]/ { f = $0; sub(/^##[[:space:]]+/, "", f); nf++; nomef[nf] = f; next }
 /^##[[:space:]]+P(o|ó)s/ { f = "Pos-lancamento"; nf++; nomef[nf] = f; next }
@@ -69,5 +81,27 @@ END {
   k = split(tags, ts, " "); for (j = 1; j <= k; j++) if (!(ts[j] in usada)) { print "FALHA lapidacao sem item #" ts[j]; falha = 1 }
   k = split(specs, ss, " "); for (j = 1; j <= k; j++) if (todo !~ ("spec " ss[j])) { print "FALHA spec " ss[j] " sem item no backlog"; falha = 1 }
   k = split(adrs, as, " "); for (j = 1; j <= k; j++) if (todo !~ ("ADR-" as[j])) { print "FALHA ADR-" as[j] " sem item (Confirmacao vira item)"; falha = 1 }
+  # Tarefas: `spec 01:T001,T002`, `spec 01:T003-T009` e `spec 02:T001 T004`.
+  s = todo; gsub(/spec /, "spec_", s); nw = split(s, ws, /[[:space:],;]+/); cur = ""
+  for (j = 1; j <= nw; j++) {
+    x = ws[j]
+    if (x ~ /^spec_[0-9][0-9]:/) { cur = substr(x, 6, 2); x = substr(x, 9) }
+    if (cur == "" || x !~ /^T[0-9]+(-T?[0-9]+)?$/) continue
+    sub(/^T/, "", x); a = x; b = x
+    if (index(x, "-")) { a = substr(x, 1, index(x, "-") - 1); b = substr(x, index(x, "-") + 1); sub(/^T/, "", b) }
+    for (y = a + 0; y <= b + 0; y++) coberta[cur ":" y] = 1
+  }
+  k = split(tarefas, tf, " ")
+  for (j = 1; j <= k; j++) { sp = substr(tf[j], 1, 2); y = substr(tf[j], 5) + 0
+    if (!((sp ":" y) in coberta)) { qt[sp]++; if (qt[sp] <= 4) lista[sp] = lista[sp] " " substr(tf[j], 4) } }
+  for (sp in qt) { print "FALHA spec " sp ": " qt[sp] " tarefa(s) sem item:" lista[sp]; falha = 1 }
+  # Capacidade: a conta e do gate, nao do modelo. Pos-lancamento fica fora.
+  for (i = 1; i <= n; i++) if (fase[ordem[i]] != "Pos-lancamento") plano += dias(est[ordem[i]])
+  if (cap == "") { print "FALHA sem conta de Capacidade: <devs> x <semanas> x 5 x 0.7 = <N> dias uteis; backlog soma <M> dias"; falha = 1 }
+  else {
+    if (capconta != "" && (capconta - cap > 1 || cap - capconta > 1)) { printf "FALHA capacidade escrita %s, a conta da %s\n", cap, capconta; falha = 1 }
+    if (plano > cap) { printf "FALHA plano soma %.1f dias e a capacidade e %s: mova itens para Pos-lancamento\n", plano, cap; falha = 1 }
+    if (soma != "" && (soma - plano > 1 || plano - soma > 1)) { printf "FALHA backlog soma escrito %s, os itens somam %.1f\n", soma, plano; falha = 1 }
+  }
   exit falha
 }

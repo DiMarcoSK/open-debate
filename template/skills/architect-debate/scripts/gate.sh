@@ -1,6 +1,7 @@
 #!/bin/sh
 # gate.sh <caso> <fase> [agent...] - gate de 1 fase para o orquestrador do modo sessao.
-# Fases: brief pesquisa proposta ataque decisao sdd specs trilhas backlog. Imprime OK/REPROVADO por arquivo, sai 1 se algo reprovou.
+# Fases: brief pesquisa agenda proposta ataque decisao sdd auditoria specs trilhas backlog. Imprime OK/REPROVADO por arquivo, sai 1 se algo reprovou.
+# status imprime o estado de cada fase e a proxima; vetados lista quem precisa de replica.
 # decisao aprovada separa os ADRs em adr/; sdd aprovado gera style-tile.html, tokens.json e tokens.css;
 # backlog aprovado exporta backlog.csv, backlog.json e backlog-gh.sh.
 set -eu
@@ -22,6 +23,7 @@ um() {
 case "$FASE" in
   brief) "$SCRIPT_DIR/validate.sh" "$CASE_DIR" --brief || FAIL=1 ;;
   pesquisa) um pesquisa debate-research "$CASE_DIR/research.md" ;;
+  agenda) um agenda debate-judge "$CASE_DIR/agenda.md" ;;
   proposta) for a in $PAINEL; do um proposta "$a" "$CASE_DIR/proposals/$a.md"; done ;;
   ataque) for a in $PAINEL; do um ataque "$a" "$CASE_DIR/critiques/$a.md"; done ;;
   decisao)
@@ -30,7 +32,10 @@ case "$FASE" in
   sdd)
     um sdd debate-judge "$CASE_DIR/SDD.md"
     [ "$FAIL" -eq 0 ] && "$SCRIPT_DIR/style-tile.sh" "$CASE_DIR" ;;
+  auditoria) um auditoria debate-auditor "$CASE_DIR/auditoria.md" ;;
   specs) "$SCRIPT_DIR/validate.sh" "$CASE_DIR" || FAIL=1 ;;
+  vetados) vetados "$CASE_DIR"; echo ;;
+  status) exec "$SCRIPT_DIR/status.sh" "$CASE_DIR" ;;
   trilhas) um trilha debate-design "$CASE_DIR/backlog/design.md"; um trilha debate-arch "$CASE_DIR/backlog/eng.md" ;;
   backlog)
     um backlog debate-pm "$CASE_DIR/BACKLOG.md"

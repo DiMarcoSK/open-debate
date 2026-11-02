@@ -1,3 +1,7 @@
+## Posicoes
+D1: opcao A porque custa menos
+D2: fora do meu escopo
+D3: opcao B com evidencia R1
 1. Job: quando chega um alerta quero triar em 30 s
 2. Escolha: Torre - driver velocidade
 ```

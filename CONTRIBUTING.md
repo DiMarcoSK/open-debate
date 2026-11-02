@@ -15,7 +15,7 @@ template/
     SKILL.md      session mode protocol
     personas/     specialists, the canonical source
     references/   templates and rules copied into each case
-    scripts/      gates and CLI mode; harness.sh is the headless adapter
+    scripts/      gates and CLI mode; harness.sh is the headless adapter, status.sh reads a case
 test/             suite, fixtures and fake CLIs
 docs/harnesses.md harness matrix and the evidence for each
 ```
@@ -42,7 +42,13 @@ docs/harnesses.md harness matrix and the evidence for each
 
 ## Format changes
 
-Agents and `gates.sh` are a contract: gates read words from the templates (`Concessao`, `Veto`, `Lacunas`). When changing a template, update the gate, the fixture and the agent together.
+Agents and `gates.sh` are a contract: gates read words and formats from the templates (`Concessao`, `### Veto contra`, `Dn:`, `Capacidade:`, the `Total` column). When changing a template, update the gate, the fixture and the agent together. `citacoes.awk`, `placar.awk` and `backlog.awk` redo what agents claim; a new claim that can be recomputed belongs there.
+
+## Adding a specialist
+
+1. Add `personas/debate-<x>.md` with the same frontmatter. State what it owns, what it does not own, its method and its proposal format, with `Posicoes` first.
+2. Add its line to `modelos.conf`, and to the specialist list in `template/entry/subagents.md`.
+3. Add its role checks and line ceiling to `gates.sh`, a `proposta-<x>.md` fixture, and its name to `test/stub/harness`.
 
 ## Tests
 
@@ -51,4 +57,4 @@ npm test
 open-debate doctor --live    # 1 real call on each installed harness
 ```
 
-CI runs on Ubuntu and macOS, with shellcheck. A prompt change can only be validated by a real debate: record the model used and the result in the PR.
+`TEMPOS=<file> npm test` records the seconds per test. CI runs on Ubuntu and macOS, with shellcheck. A prompt change can only be validated by a real debate: record the model used and the result in the PR.

@@ -1,5 +1,5 @@
 ### Veto contra debate-gcp
-- Citacao: "Custo teto 100/mes" (proposals/debate-gcp.md:4)
+- Citacao: "D1: opcao A porque custa menos" (proposals/debate-gcp.md:2)
 - Problema: sem alerta de budget
 - Evidencia: research.md R1
 - Troca: budget com alerta em 80%

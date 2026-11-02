@@ -7,7 +7,7 @@ Objetivo.
 ## 2. Restricoes, premissas e drivers
 Prazo 8 semanas.
 ## 3. Decisoes
-ADR-0001.
+ADR-0001, ADR-0002, ADR-0003.
 ## 4. Arquitetura
 ```mermaid
 flowchart LR

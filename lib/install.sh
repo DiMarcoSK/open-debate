@@ -24,8 +24,10 @@ resolve_target() {
   VERSAO="$TARGET/$H_SKILLS/$SKILL/.open-debate-version"
 }
 
+# shasum sobe um perl por arquivo: na instalacao, com centenas de hashes, ele era o maior custo.
 sha() {
   if command -v sha256sum >/dev/null 2>&1; then sha256sum | cut -d' ' -f1
+  elif [ -x /sbin/sha256 ]; then /sbin/sha256 -q
   else shasum -a 256 | cut -d' ' -f1; fi
 }
 
@@ -39,16 +41,27 @@ hash_file() {
 
 sed_esc() { printf '%s' "$1" | sed 's/[\\&#]/\\&/g'; }
 
-# render <origem>: troca os placeholders pelos caminhos da instalacao. Patterns iguais viram 1 so,
-# chave repetida no frontmatter quebra o YAML do agent.
+# prepara_render <dir>: 1 script de sed por harness, em vez de escapar os caminhos a cada arquivo.
+# Patterns iguais viram 1 so: chave repetida no frontmatter quebra o YAML do agent.
+prepara_render() {
+  RENDER_SED="$1.sed"
+  {
+    if [ "$SCRIPTS" = "$SCRIPTS_ABS" ]; then printf '/{{SCRIPTS_ABS}}/d\n'
+    else printf 's#{{SCRIPTS_ABS}}#%s#g\n' "$(sed_esc "$SCRIPTS_ABS")"; fi
+    printf 's#{{SCRIPTS}}#%s#g\n' "$(sed_esc "$SCRIPTS")"
+    printf 's#{{SKILL_DIR}}#%s#g\n' "$(sed_esc "$SKILL_DIR")"
+    printf 's#{{HARNESS}}#%s#g\n' "$H_ID"
+    printf 's#{{HARNESS_NAME}}#%s#g\n' "$(sed_esc "$H_NAME")"
+    printf 's#{{DELEGATE}}#%s#g\n' "$(sed_esc "$H_DELEGATE")"
+  } > "$RENDER_SED"
+}
+
+# render <origem>: troca os placeholders pelos caminhos da instalacao.
 render() {
-  case "$(basename "$1")" in
-    debate.md|subagents.md) incluir_delegacao "$1" ;;
-    *) cat "$1" ;;
-  esac | if [ "$SCRIPTS" = "$SCRIPTS_ABS" ]; then sed -e '/{{SCRIPTS_ABS}}/d' -e "s#{{SCRIPTS}}#$(sed_esc "$SCRIPTS")#g"
-  else sed -e "s#{{SCRIPTS}}#$(sed_esc "$SCRIPTS")#g" -e "s#{{SCRIPTS_ABS}}#$(sed_esc "$SCRIPTS_ABS")#g"; fi \
-  | sed -e "s#{{SKILL_DIR}}#$(sed_esc "$SKILL_DIR")#g" -e "s#{{HARNESS}}#$H_ID#g" -e "s#{{HARNESS_NAME}}#$(sed_esc "$H_NAME")#g" \
-        -e "s#{{DELEGATE}}#$(sed_esc "$H_DELEGATE")#g"
+  case "$1" in
+    */debate.md|*/subagents.md) incluir_delegacao "$1" | sed -f "$RENDER_SED" ;;
+    *) sed -f "$RENDER_SED" "$1" ;;
+  esac
 }
 
 entrada() {
@@ -77,11 +90,13 @@ EOF
 
 # stage <dir>: monta em <dir> tudo que vai para TARGET.
 stage() {
-  (cd "$TEMPLATE/skills/$SKILL" && find . -type f ! -name .DS_Store | sed 's#^\./##') | while IFS= read -r f; do
-    mkdir -p "$1/$H_SKILLS/$SKILL/$(dirname "$f")"
+  prepara_render "$1"
+  # Quase nada tem placeholder: copia a arvore de uma vez e renderiza so o que precisa.
+  mkdir -p "$1/$H_SKILLS"
+  cp -Rp "$TEMPLATE/skills/$SKILL" "$1/$H_SKILLS/"
+  find "$1/$H_SKILLS/$SKILL" -name .DS_Store -exec rm -f {} +
+  (cd "$TEMPLATE/skills/$SKILL" && grep -rl '{{' .) | sed 's#^\./##' | while IFS= read -r f; do
     render "$TEMPLATE/skills/$SKILL/$f" > "$1/$H_SKILLS/$SKILL/$f"
-    [ -x "$TEMPLATE/skills/$SKILL/$f" ] && chmod +x "$1/$H_SKILLS/$SKILL/$f"
-    :
   done
   p="$TEMPLATE/skills/$SKILL/personas"
   case "$H_MODE" in
