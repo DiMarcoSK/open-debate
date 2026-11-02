@@ -38,7 +38,7 @@ refs_ok() {
   { [ -s "$rs" ] && ! pulado "$rs" && grep -Eq '^\|[ *]*R[0-9]+[ *]*\|' "$rs"; } || return 0
   ruins=""
   for r in $(grep -Eo '(^|[^A-Za-z0-9_-])R[0-9]+([^A-Za-z0-9_-]|$)' "$1" | grep -Eo 'R[0-9]+' | sort -u); do
-    grep -Eq "^\|[ *]*$r[ *]*\|" "$rs" || ruins="$ruins $r"
+    grep -Eq "^\|[ *]*${r}[ *]*\|" "$rs" || ruins="$ruins $r"
   done
   [ -z "$ruins" ] || printf '; cita id inexistente em research.md:%s' "$ruins"
 }
