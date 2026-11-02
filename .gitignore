@@ -3,3 +3,5 @@ cases/
 .opencode/
 *.tgz
 .DS_Store
+mempalace.yaml
+entities.json
