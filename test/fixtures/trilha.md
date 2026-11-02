@@ -1,0 +1,9 @@
+- Item 1. Aceite: funciona em ate 1 s (SDD-5) {P, #copy}
+- Item 2. Aceite: funciona em ate 2 s (SDD-5) {P, #copy}
+- Item 3. Aceite: funciona em ate 3 s (SDD-5) {P, #copy}
+- Item 4. Aceite: funciona em ate 4 s (SDD-5) {P, #copy}
+- Item 5. Aceite: funciona em ate 5 s (SDD-5) {P, #copy}
+- Item 6. Aceite: funciona em ate 6 s (SDD-5) {P, #copy}
+- Item 7. Aceite: funciona em ate 7 s (SDD-5) {P, #copy}
+- Item 8. Aceite: funciona em ate 8 s (SDD-5) {P, #copy}
+- Item 9. Aceite: funciona em ate 9 s (SDD-5) {P, #copy}

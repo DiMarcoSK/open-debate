@@ -1,0 +1,36 @@
+{
+  "name": "open-debate",
+  "version": "0.1.0",
+  "description": "Turn a raw product idea into a researched, debated design: SDD, ADRs, design tokens, specs and backlog, built by a panel of opencode agents",
+  "keywords": [
+    "opencode",
+    "ai",
+    "agents",
+    "architecture",
+    "adr",
+    "sdd",
+    "design-tokens",
+    "spec-driven-development"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/FelipeDiMarco/open-debate",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/FelipeDiMarco/open-debate.git"
+  },
+  "bin": {
+    "open-debate": "bin/open-debate"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "template"
+  ],
+  "os": [
+    "darwin",
+    "linux"
+  ],
+  "scripts": {
+    "test": "sh test/run.sh"
+  }
+}

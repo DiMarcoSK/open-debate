@@ -1,0 +1,90 @@
+#!/bin/sh
+# open-debate - CLI: instala o /debate no opencode e expoe os scripts do protocolo.
+set -eu
+
+self="$0"
+while [ -L "$self" ]; do
+  link="$(readlink "$self")"
+  case "$link" in /*) self="$link" ;; *) self="$(dirname -- "$self")/$link" ;; esac
+done
+ROOT="$(CDPATH= cd -- "$(dirname -- "$self")/.." && pwd)"
+TEMPLATE="$ROOT/template"
+SKILL="skills/architect-debate"
+PKG_SCRIPTS="$TEMPLATE/$SKILL/scripts"
+. "$ROOT/lib/install.sh"
+
+version() { sed -n 's/^[[:space:]]*"version":[[:space:]]*"\([^"]*\)".*/\1/p' "$ROOT/package.json" | head -1; }
+
+usage() {
+  cat <<EOF
+open-debate $(version) - de uma ideia a SDD, ADRs, tokens, specs e backlog, por debate entre agents
+
+Instalacao no opencode:
+  open-debate init [--project] [--force]       instala agents, /debate e skill
+  open-debate update [--project] [--force]     atualiza preservando modelos e edicoes
+  open-debate uninstall [--project] [--force]  remove o que foi instalado
+  open-debate doctor [--project]               confere dependencias, instalacao e modelos
+  open-debate models [check|apply|free] [--project]
+
+Casos (modo CLI, para modelo pago ou proprio; na sessao use /debate):
+  open-debate new "<ideia>" [dest]             cria o caso, default dest=cases
+  open-debate run <caso> [rounds]              fases 1-6, e 8 com specs preenchidas
+  open-debate specs <caso> <slug> [slug...]    cria specs/<nn>-<slug>/
+  open-debate gate <caso> <fase> [agent...]    roda o gate de 1 fase
+  open-debate validate <caso> [--brief]        roda todos os gates do caso
+  open-debate backlog <caso>                   exporta CSV, JSON e script gh
+  open-debate tile <caso> [fonte.md]           gera style-tile.html e tokens
+
+--project usa ./.opencode em vez de ~/.config/opencode.
+Env do run: MODEL, MODEL_FALLBACK, PAINEL, RETRIES, TIMEOUT, RESEARCH, FACTCHECK, REVIEW, REPAIR, FRESH.
+EOF
+}
+
+run_script() {
+  s="$1"; shift
+  exec "$PKG_SCRIPTS/$s" "$@"
+}
+
+need_args() {
+  [ "$1" -ge "$2" ] || { usage >&2; exit 2; }
+}
+
+cmd="${1:-help}"
+[ "$#" -eq 0 ] || shift
+case "$cmd" in
+  -h|--help|help) usage ;;
+  -v|--version|version) version ;;
+  init|update|uninstall|doctor|models)
+    PROJECT=0; FORCE=0; ARG=""
+    for a in "$@"; do
+      case "$a" in
+        --project) PROJECT=1 ;;
+        --force) FORCE=1 ;;
+        -*) echo "erro: opcao desconhecida: $a" >&2; exit 2 ;;
+        *) ARG="$a" ;;
+      esac
+    done
+    resolve_target
+    case "$cmd" in
+      init) do_install init ;;
+      update) do_install update ;;
+      uninstall) do_uninstall ;;
+      doctor) do_doctor ;;
+      models) do_models "${ARG:-check}" ;;
+    esac ;;
+  new) need_args "$#" 1; run_script new-debate.sh "$@" ;;
+  run)
+    need_args "$#" 1
+    PROJECT=0; resolve_target
+    if [ ! -f "$MANIFEST" ] && [ ! -f "$TARGET/agents/debate-judge.md" ]; then
+      PROJECT=1; resolve_target
+    fi
+    [ -f "$TARGET/agents/debate-judge.md" ] || { echo "erro: agents do debate nao instalados, rode: open-debate init" >&2; exit 2; }
+    run_script debate.sh "$@" ;;
+  specs) need_args "$#" 2; run_script make-specs.sh "$@" ;;
+  gate) need_args "$#" 2; run_script gate.sh "$@" ;;
+  validate) need_args "$#" 1; run_script validate.sh "$@" ;;
+  backlog) need_args "$#" 1; run_script backlog-export.sh "$@" ;;
+  tile) need_args "$#" 1; run_script style-tile.sh "$@" ;;
+  *) echo "erro: comando desconhecido: $cmd" >&2; usage >&2; exit 2 ;;
+esac
