@@ -81,6 +81,7 @@ line_cap() {
     agenda:*) printf 20 ;;
     decision:*) printf 150 ;;
     audit:*) printf 25 ;;
+    completeness:*) printf 45 ;;
     brand:*) printf 120 ;;
     backlog:*) printf 150 ;;
     *) printf 0 ;;
@@ -175,7 +176,7 @@ check() {
   [ "$phase" = "spec" ] && { check_spec "$f"; return 0; }
   if [ ! -s "$f" ]; then printf 'output missing or empty'; return 0; fi
   case "$phase" in
-    proposal|critique) c="$(parent "$(parent "$f")")" ;;
+    proposal|critique|completeness) c="$(parent "$(parent "$f")")" ;;
     *) c="$(parent "$f")" ;;
   esac
   m="$(size_ok "$phase" "$a" "$f")"
@@ -314,6 +315,25 @@ check() {
         o="$(awk -v mode=list -f "$TOK" "$c/SDD.md" | sort)"; d="$(awk -v mode=list -f "$TOK" "$f" 2>/dev/null | sort)"
         [ "$o" = "$d" ] || m="$m; BRANDBOOK TOKENS differ from the SDD: copy them literally"
       fi ;;
+    completeness)
+      grep -Eq '^Verdict: (COMPLETE|GAPS|APPLIED)' "$f" || m="$m; no Verdict: COMPLETE|GAPS line"
+      ns="$(grep -cE '^\| *[0-9]+ \| *[A-Z]' "$c/completeness.md" 2>/dev/null || true)"
+      r="$(awk -F'|' -v ns="${ns:-13}" -v bl="$c/BACKLOG.md" '
+        BEGIN { while ((getline l < bl) > 0) if (match(l, /^- \[[ xX]\] B[0-9]+/)) { x = substr(l, RSTART, RLENGTH); sub(/.* /, "", x); ok[x] = 1 } }
+        /^\|[ *]*[0-9]+[ .]/ {
+          st = $2; gsub(/^[ *]+|[ *]+$/, "", st); s = tolower($3); gsub(/[ *`]/, "", s); it = $4
+          n = st + 0; if (n < 1 || n in seen) next; seen[n] = 1; k++
+          if (s != "covered" && s != "gap" && s != "n/a") { print "stage " st " with status " s ", expected covered, gap or n/a"; next }
+          if (s == "n/a" && it ~ /^[ ]*$/) print "stage " st " n/a without a reason"
+          if (s == "covered") { c = 0; t = it; while (match(t, /B[0-9]+/)) { b = substr(t, RSTART, RLENGTH); c++; if (!(b in ok)) print "stage " st " cites " b ", missing from BACKLOG.md"; t = substr(t, RSTART + RLENGTH) }
+            if (!c) print "stage " st " covered without B ids" }
+          if (s == "gap") gap = 1
+        }
+        /^\|[ *]*G[0-9]+[ *]*\|/ { g++ }
+        END { if (k < ns) print k + 0 " stage row(s), expected " ns " (1 per stage of completeness.md)"
+              if (gap && !g) print "a stage is a gap but there is no | Gn | row" }' "$f")"
+      [ -z "$r" ] || m="$m; $(printf '%s' "$r" | tr '\n' ';' | sed 's/;$//; s/;/; /g')"
+      if grep -q '^Verdict: GAPS' "$f"; then grep -Eq '^\|[ *]*G[0-9]+[ *]*\|' "$f" || m="$m; GAPS without a | Gn | row"; fi ;;
     track)
       has "$f" 'Acceptance' || m="$m; items without Acceptance"
       [ "$(grep -c '^- ' "$f")" -ge 8 ] || m="$m; fewer than 8 items" ;;
@@ -352,6 +372,57 @@ check() {
       fi ;;
   esac
   printf '%s' "${m#; }"
+}
+
+# --- cards: 1 per backlog item before Post-launch, written in groups of up to 10 items of the same phase.
+# card_groups <case>: 1 line per group, "nn<TAB>phase<TAB>B ids<TAB>spec folders the items cite".
+card_groups() {
+  cg_sd="$(cd "$1/specs" 2>/dev/null && ls -d [0-9][0-9]-*/ 2>/dev/null | tr -d / | tr '\n' ' ' || true)"
+  awk -v mode=tsv -f "$AWKS/backlog.awk" "$1/BACKLOG.md" | awk -F'\t' -v sd="$cg_sd" '
+    BEGIN { k = split(sd, d, " "); for (i = 1; i <= k; i++) dir[substr(d[i], 1, 2)] = d[i] }
+    $2 == "Post-launch" { next }
+    { if (g == 0 || $2 != name[g] || c == 10) { g++; name[g] = $2; c = 0 }
+      c++; ids[g] = ids[g] " " $1
+      s = $6; while (match(s, /spec [0-9][0-9]/)) { x = substr(s, RSTART + 5, 2); if ((x in dir) && index(sp[g], dir[x]) == 0) sp[g] = sp[g] " specs/" dir[x] "/"; s = substr(s, RSTART + RLENGTH) } }
+    END { for (i = 1; i <= g; i++) printf "%02d\t%s\t%s\t%s\n", i, name[i], substr(ids[i], 2), substr(sp[i], 2) }'
+}
+
+# check_cards <file> <ids>: prints what is missing per card, or nothing.
+check_cards() {
+  [ -s "$1" ] || { printf 'output missing or empty'; return 0; }
+  awk -v want="$2" '
+    function close_card() { if (id != "") { if (!wh) miss[id] = miss[id] " What"; if (st < 2) miss[id] = miss[id] " How(2+ steps)"
+        if (!fi) miss[id] = miss[id] " Files"; if (!gw) miss[id] = miss[id] " Done-when(Given/When/Then)"; if (!te) miss[id] = miss[id] " Test" } }
+    /^#+[[:space:]]*B[0-9]+/ { close_card(); match($0, /B[0-9]+/); id = substr($0, RSTART, RLENGTH); got[id] = 1; wh = st = fi = gw = te = how = 0; next }
+    id == "" { next }
+    /^- (\*\*)?What/ { wh = 1; how = 0 }
+    /^- (\*\*)?How/ { how = 1; next }
+    how && /^[[:space:]]*[0-9]+[.)]/ { st++ }
+    /^- (\*\*)?Files/ { fi = 1; how = 0 }
+    /^- (\*\*)?(Interfaces|Source|Risks)/ { how = 0 }
+    /^- (\*\*)?Done when/ { how = 0 }
+    /Given.*When.*Then/ { gw = 1 }
+    /^- (\*\*)?Test/ { te = 1; how = 0 }
+    /<step|<paths|<state>|<item title>/ { ph = 1 }
+    END { close_card(); k = split(want, w, " ")
+      for (i = 1; i <= k; i++) { if (!(w[i] in got)) r = r "; no card for " w[i]; else if (w[i] in miss) r = r "; " w[i] " without" miss[w[i]] }
+      if (ph) r = r "; placeholder in the text"
+      printf "%s", substr(r, 3) }' "$1"
+}
+
+# merge_cards <case>: BACKLOG-DETAILED.md, the cards of every group in execution order, under their phase.
+merge_cards() {
+  t="$(sed -n '1s/^# *Backlog *-* *//p' "$1/BACKLOG.md")"
+  { printf '# Backlog in detail - %s\n\nOrder, estimates and dependencies come from BACKLOG.md; each card says what to build and how. Post-launch items have no card until they are scheduled.\n' "${t:-product}"
+    card_groups "$1" | while IFS="$(printf '\t')" read -r n ph ids sp; do
+      [ "$ph" = "${last:-}" ] || printf '\n## %s\n' "$ph"; last="$ph"
+      awk -v want="$ids" '
+        /^#+[[:space:]]*B[0-9]+/ { match($0, /B[0-9]+/); id = substr($0, RSTART, RLENGTH); sub(/^#+/, "###"); txt[id] = ""; on = 1 }
+        /^#+[[:space:]]/ && !/^#+[[:space:]]*B[0-9]+/ { on = 0 }
+        on { txt[id] = txt[id] $0 "\n" }
+        END { k = split(want, w, " "); for (i = 1; i <= k; i++) if (w[i] in txt) { sub(/\n+$/, "\n", txt[w[i]]); printf "\n%s", txt[w[i]] } }' "$1/backlog/cards/$n.md"
+    done
+  } > "$1/BACKLOG-DETAILED.md"
 }
 
 # An output older than its input: someone edited the case and the rest did not follow.

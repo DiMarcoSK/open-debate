@@ -35,6 +35,9 @@ case "$task" in
   "phase brand"*) f=BRANDBOOK.md ;;
   "phase audit"*) f="${STUB_AUDIT:-audit.md}" ;;
   "phase spec"*) f=spec-bundle.md ;;
+  "phase backlog-audit"*) f="${STUB_BACKLOG_AUDIT:-backlog-audit.md}" ;;
+  "phase backlog-fix"*) f=BACKLOG.md ;;
+  "phase cards"*) f=cards.md ;;
   "phase backlog-design"*|"phase backlog-eng"*) f=track.md ;;
   "phase backlog"*) f=BACKLOG.md ;;
   *) echo "stub: unknown task: $task" >&2; exit 2 ;;

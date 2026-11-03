@@ -17,6 +17,8 @@ phase 2 proposal: 6/6 ok, ux repaired (ink/paper contrast)
 phase 3 critique: 4/4 ok
 phase 6 decision: 5 ADRs, 4 specs; audit: 1 defect fixed
 phase 8 backlog: 42 items, 61 days, critical path B01 -> B07 -> B19 -> B33
+phase 8b completeness: 2 gaps (privacy policy, cost alerts), added as B40 and B44
+phase 8c cards: 44/44, BACKLOG-DETAILED.md
 ```
 
 The numbers above illustrate the output format. Write the idea and answer the intake in any language: the agent talks back in yours, and every artifact is written in English.
@@ -82,6 +84,8 @@ open-debate init --project                 # current project instead of user lev
 | `BRANDBOOK.md` | With `debate-brand` on the panel: brand platform, voice, logo, color, type, and every key screen adapted to the brand |
 | `specs/` | `spec.md`, `plan.md` and `tasks.md` per feature, GitHub Spec Kit style, with EARS requirements |
 | `BACKLOG.md`, `backlog.csv`, `backlog.json`, `backlog-gh.sh` | Backlog through launch, with dependencies, estimates and critical path |
+| `backlog/audit.md` | Completeness audit of the backlog, stage by stage from an empty repository to a launched, operated product; every gap becomes an item |
+| `BACKLOG-DETAILED.md` | 1 card per item: what to build, how in steps, files, interfaces, Given/When/Then and the test. Also in the CSV and the GitHub issues |
 
 ## Why it works
 
@@ -98,7 +102,7 @@ open-debate init --project                 # current project instead of user lev
 ### In a session
 
 ```text
-/debate <idea> [--panel design,brand,sec] [--rounds 1-3] [--no-research] [--no-factcheck]
+/debate <idea> [--panel design,brand,sec] [--rounds 1-3] [--no-research] [--no-factcheck] [--no-audit] [--no-cards]
 ```
 
 The agent asks up to 6 intake questions and runs the phases. The case lives in `cases/<slug>/`. Running `/debate` again on an existing case resumes from the first phase that fails its gate.
@@ -159,7 +163,7 @@ open-debate run "$case" --harness claude --mix claude,codex,gemini
 | `gate`, `validate` | Run the gates for one phase or the whole case |
 | `backlog`, `tile` | Export the backlog and the style tile |
 
-`run` variables: `HARNESS`, `MODEL`, `MODEL_FALLBACK` (space-separated chain), `MIX`, `ROUTES`, `HARNESS_CMD`, `PANEL`, `FROM`, `RETRIES=2`, `TIMEOUT=600`, `BACKOFF=20`, `PARALLEL=6` (simultaneous calls, 0 for no limit), `MAX_CALLS=0` (hard limit per run, 0 for none), `MIN_LINES=5`, `RESEARCH=1`, `AGENDA=1`, `FACTCHECK=1`, `SPECS=1`, `REVIEW=1` (audit), `REPAIR=1`, `FRESH=0`.
+`run` variables: `HARNESS`, `MODEL`, `MODEL_FALLBACK` (space-separated chain), `MIX`, `ROUTES`, `HARNESS_CMD`, `PANEL`, `FROM`, `RETRIES=2`, `TIMEOUT=600`, `BACKOFF=20`, `PARALLEL=6` (simultaneous calls, 0 for no limit), `MAX_CALLS=0` (hard limit per run, 0 for none), `MIN_LINES=5`, `RESEARCH=1`, `AGENDA=1`, `FACTCHECK=1`, `SPECS=1`, `REVIEW=1` (SDD and backlog audits), `CARDS=1`, `REPAIR=1`, `FRESH=0`.
 
 ## The protocol
 
@@ -176,6 +180,8 @@ flowchart TD
   G2 --> H[Per-feature specs]
   H --> I[Design and engineering tracks]
   I --> J[Backlog through launch]
+  J --> K[Completeness audit from repo to operations]
+  K --> L[Cards: what and how per item]
 ```
 
 | Phase | Agent | Gate |
@@ -192,6 +198,8 @@ flowchart TD
 | 6d brandbook | `debate-brand`, only when on the panel | sections 1-8, tokens identical to the SDD with contrast, logo, voice, every key screen adapted |
 | 7 specs | `debate-arch`, `debate-design` | EARS, cited ADRs exist, every user story has tasks |
 | 8 backlog | `debate-ux`, `debate-arch`, `debate-pm` | 15+ items, covers specs, tasks, ADRs and polish, no cycles, capacity math checks out and the plan fits |
+| 8b completeness | `debate-auditor`, then `debate-pm` | 13 stages from repository to operations, each covered by items that exist, marked n/a with a reason, or a gap that becomes an item |
+| 8c cards | `debate-arch`, in groups of up to 10 | every item has What, How in steps, Files, Done when in Given/When/Then and Test |
 
 Details in [`protocol.md`](template/skills/architect-debate/references/protocol.md) and the [debate rules](template/skills/architect-debate/references/debate-rules.md).
 

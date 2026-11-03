@@ -46,6 +46,14 @@ for d in "$CASE_DIR"/specs/*/; do
 done
 
 if [ -s "$CASE_DIR/BACKLOG.md" ]; then gate backlog debate-pm "$CASE_DIR/BACKLOG.md"; fi
+[ ! -f "$CASE_DIR/backlog/audit.md" ] || gate completeness debate-auditor "$CASE_DIR/backlog/audit.md"
+if [ -s "$CASE_DIR/BACKLOG-DETAILED.md" ]; then
+  card_groups "$CASE_DIR" > "$CASE_DIR/.groups.tmp"
+  while IFS="$(printf '\t')" read -r n ph ids sp; do
+    r="$(check_cards "$CASE_DIR/backlog/cards/$n.md" "$ids")"; [ -z "$r" ] || say "$CASE_DIR/backlog/cards/$n.md" 0 "$r"
+  done < "$CASE_DIR/.groups.tmp"
+  rm -f "$CASE_DIR/.groups.tmp"
+fi
 
 grep -rn '\[assumed' "$CASE_DIR" --include='*.md' --exclude='*-template.md' --exclude='debate-rules.md' --exclude='visual-contract.md' --exclude='polish.md' --exclude-dir=raw 2>/dev/null \
   | grep -vi 'owner' | grep -v '`\[assumed' > "$CASE_DIR/.assumed.tmp" || true

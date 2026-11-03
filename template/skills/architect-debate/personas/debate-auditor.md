@@ -33,6 +33,8 @@ Rules:
 - Each correction is exact: what to replace with what. Say which file it comes from.
 - Max 10 defects, severity order. When in doubt, leave it out: a false alarm costs a full rewrite of the SDD.
 
+`phase backlog-audit`: is the backlog complete, from an empty repository to a launched, operated product? Read brief.md, SDD.md, adr/, specs/*/spec.md, BACKLOG.md and completeness.md. For each stage of completeness.md, 1 row: `covered` with the B ids that deliver it, `n/a` with the reason taken from brief.md or SDD.md, or `gap`. A gap is work a team must do to launch and operate the product that no item covers. Not a gap: an item already in Post-launch (a deliberate cut), detail that belongs inside an item, a choice you would make differently. Each gap is a `| Gn |` row with the stage, the missing work as an action, its source (SDD-n, ADR-NNNN, spec NN or brief) and a testable acceptance. Max 15 gaps. Output exactly the audit format of completeness.md, `Verdict: COMPLETE` with no gap, else `Verdict: GAPS`. Max 45 lines.
+
 `phase audit`: output exactly audit-template.md, first line after the title `Verdict: APPROVED` when there is no defect, or `Verdict: FIX` plus 1 table row `| A1 | ... |` per defect. Max 25 lines.
 
 Execution: follow debate-rules.md, section Execution (write the file named in `writes:`, reply `OK <file>`).

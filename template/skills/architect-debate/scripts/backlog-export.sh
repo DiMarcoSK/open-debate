@@ -13,8 +13,15 @@ awk -v mode=tsv -f "$SCRIPT_DIR/backlog.awk" "$B" | jq -R -s '
     id: .[0], phase: .[1], epic: .[2], title: .[3], acceptance: .[4], origin: .[5], estimate: .[6],
     days: (.[7] | tonumber), deps: (.[8] | split(" ") | map(select(length > 0))),
     tags: (.[9] | split(" ") | map(select(length > 0))), blocks_phase: (.[10] == "yes"), status: .[11] })' > "$CASE_DIR/backlog.json"
+# With BACKLOG-DETAILED.md, each item carries its card: what to build and how, in the CSV description and the issue body.
+D="$CASE_DIR/BACKLOG-DETAILED.md"
+if [ -s "$D" ]; then
+  jq -Rs '("\n" + .) | split("\n### ") | map(select(test("^B[0-9]+")) | {key: capture("^(?<id>B[0-9]+)").id, value: ("### " + sub("\n+$"; ""))}) | from_entries' "$D" > "$CASE_DIR/backlog.cards.tmp"
+  jq --slurpfile c "$CASE_DIR/backlog.cards.tmp" 'map(. + (if $c[0][.id] then {card: $c[0][.id]} else {} end))' "$CASE_DIR/backlog.json" > "$CASE_DIR/backlog.json.tmp"
+  mv "$CASE_DIR/backlog.json.tmp" "$CASE_DIR/backlog.json"; rm -f "$CASE_DIR/backlog.cards.tmp"
+fi
 jq -r '(["ID","Summary","Description","Epic","Phase","Estimate","Days","Depends on","Labels","Blocks phase","Status"] | @csv),
-  (.[] | [.id, .title, ("Acceptance: " + .acceptance + "\nSource: " + .origin), .epic, .phase, .estimate, .days,
+  (.[] | [.id, .title, ("Acceptance: " + .acceptance + "\nSource: " + .origin + (if .card then "\n\n" + .card else "" end)), .epic, .phase, .estimate, .days,
     (.deps | join(" ")), (.tags | join(" ")), (if .blocks_phase then "yes" else "no" end), .status] | @csv)' \
   "$CASE_DIR/backlog.json" > "$CASE_DIR/backlog.csv"
 {
@@ -24,7 +31,8 @@ jq -r '(["ID","Summary","Description","Epic","Phase","Estimate","Days","Depends 
   jq -r '.[] | select(.status == "open") |
     "gh issue create --title " + ((.id + " " + .title) | @sh) + " --body " +
     (("Acceptance: " + .acceptance + "\n\nSource: " + .origin + "\nPhase: " + .phase + "\nEstimate: " + .estimate +
-      (if (.deps | length) > 0 then "\nDepends on: " + (.deps | join(", ")) else "" end)) | @sh) +
+      (if (.deps | length) > 0 then "\nDepends on: " + (.deps | join(", ")) else "" end) +
+      (if .card then "\n\n" + .card else "" end)) | @sh) +
     ([.tags[] | " --label " + @sh] | join(""))' "$CASE_DIR/backlog.json"
 } > "$CASE_DIR/backlog-gh.sh"
 awk -v mode=summary -f "$SCRIPT_DIR/backlog.awk" "$B"

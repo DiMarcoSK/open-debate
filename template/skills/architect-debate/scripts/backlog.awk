@@ -33,7 +33,7 @@ function path(id,  n, i, d, v, best, ds) {
   order[n] = id; phase[id] = f; done[id] = (l ~ /^- \[[xX]\]/) ? "done" : "open"
   r = substr(l, RSTART + RLENGTH); blocks[id] = (r ~ /^[[:space:]]*\[P\]/) ? "yes" : "no"; sub(/^[[:space:]]*\[P\][[:space:]]*/, "", r)
   meta = ""; if (match(r, /\{[^{}]*\}[[:space:]]*$/)) { meta = substr(r, RSTART + 1, RLENGTH - 2); r = substr(r, 1, RSTART - 1) substr(r, RSTART + RLENGTH) }
-  orig[id] = ""; if (match(r, /\([^()]*(spec|ADR-|SDD)[^()]*\)/)) { orig[id] = substr(r, RSTART + 1, RLENGTH - 2); r = substr(r, 1, RSTART - 1) substr(r, RSTART + RLENGTH) }
+  orig[id] = ""; if (match(r, /\([^()]*(spec|ADR-|SDD|brief)[^()]*\)/)) { orig[id] = substr(r, RSTART + 1, RLENGTH - 2); r = substr(r, 1, RSTART - 1) substr(r, RSTART + RLENGTH) }
   ac[id] = ""; if (match(r, /Acceptance:/)) { ac[id] = clean(substr(r, RSTART + 11)); r = substr(r, 1, RSTART - 1) }
   sub(/\[[^]]*\][[:space:]]*$/, "", ac[id]); tit[id] = clean(r); sub(/\.$/, "", tit[id]); ac[id] = clean(ac[id])
   est[id] = ""; dep[id] = ""; tg[id] = ""; ep[id] = ""; indep = 0
@@ -70,7 +70,7 @@ END {
   for (id in dup) { print "FAIL duplicate id " id; fail = 1 }
   for (i = 1; i <= n; i++) { id = order[i]
     if (ac[id] == "") { print "FAIL " id " without Acceptance"; fail = 1 }
-    if (orig[id] == "") { print "FAIL " id " without a source (spec NN:Txxx, ADR-NNNN or SDD-n)"; fail = 1 }
+    if (orig[id] == "") { print "FAIL " id " without a source (spec NN:Txxx, ADR-NNNN, SDD-n or brief)"; fail = 1 }
     if (days(est[id]) == 0) { print "FAIL " id " without est S/M/L"; fail = 1 }
     if (tolower(tit[id]) ~ /^(do|build|create|implement|make) (the )?(backend|frontend|screens?|api)$/) { print "FAIL " id " is not a vertical slice: " tit[id]; fail = 1 }
     k = split(dep[id], ds, " "); for (j = 1; j <= k; j++) {

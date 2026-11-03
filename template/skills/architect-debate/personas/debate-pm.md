@@ -58,4 +58,6 @@ Rules:
 
 Output: exactly backlog-template.md, every item in its line format, max 150 lines.
 
+`phase backlog-fix`: read backlog/audit.md, BACKLOG.md, brief.md, SDD.md, adr/, specs/*/tasks.md, polish.md and backlog-template.md. Add 1 or more items per `| Gn |` row of backlog/audit.md, in the phase where the work belongs, with the acceptance of the row and its source plus the gap id (`(brief, G1)`, `(SDD-7, G2)`). Keep every existing item, renumber B ids in execution order and fix the dependencies to the new ids. Redo the capacity sum; over capacity, move the lowest value items to Post-launch and say which. Reply with the full BACKLOG.md.
+
 Execution: follow debate-rules.md, section Execution.

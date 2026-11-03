@@ -11,7 +11,7 @@ PANEL="${PANEL:-$(case_panel "$CASE_DIR")}"
 if legacy_case "$CASE_DIR"; then echo "warning: $LEGACY_HINT"; fi
 NEXT=""
 row() {
-  printf '%-10s %s\n' "$1" "$2"
+  printf '%-12s %s\n' "$1" "$2"
   case "$2" in ok*|skipped*|optional*) ;; *) [ -n "$NEXT" ] || NEXT="$1" ;; esac
 }
 single() {
@@ -52,6 +52,10 @@ if [ "$tot" -eq 0 ]; then row specs pending
 elif [ "$ok" -eq "$tot" ]; then row specs "ok $ok/$tot"
 else row specs "failed $ok/$tot, missing:$r"; fi
 single backlog debate-pm "$CASE_DIR/BACKLOG.md"
+if [ -s "$CASE_DIR/backlog/audit.md" ]; then single completeness debate-auditor "$CASE_DIR/backlog/audit.md"
+elif [ -s "$CASE_DIR/BACKLOG.md" ]; then row completeness "optional, did not run"; fi
+if [ -s "$CASE_DIR/BACKLOG-DETAILED.md" ]; then row cards "ok $(grep -c '^### B' "$CASE_DIR/BACKLOG-DETAILED.md") card(s)"
+elif [ -s "$CASE_DIR/BACKLOG.md" ]; then row cards "optional, did not run"; fi
 if [ -n "$NEXT" ]; then printf 'next: %s\n' "$NEXT"
 elif "$SCRIPT_DIR/validate.sh" "$CASE_DIR" > /dev/null 2>&1; then echo 'next: none, case complete'
 else echo 'next: no phase left, but validate fails: run open-debate validate'; fi

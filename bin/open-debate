@@ -53,8 +53,8 @@ mobile, gcp, aws, k8s (references/panel.conf).
 Input (the idea and the brief answers) can be in any language; every artifact is written in English.
 --mix spreads the panel across different harnesses: each one argues with another model.
 --fallback lists the models tried, in order, when one runs out of quota; then come the --mix harnesses. The run fails only when none is left.
---from archives that phase and the later ones in raw/archive and redoes them: research agenda proposal critique factcheck rebuttal decision sdd brand specs backlog.
-Run env: MODEL, MODEL_FALLBACK, HARNESS, HARNESS_CMD, ROUTES, MIX, PANEL, RETRIES, TIMEOUT, BACKOFF, PARALLEL, MAX_CALLS, RESEARCH, AGENDA, FACTCHECK, SPECS, REVIEW, REPAIR, FRESH.
+--from archives that phase and the later ones in raw/archive and redoes them: research agenda proposal critique factcheck rebuttal decision sdd brand specs backlog cards.
+Run env: MODEL, MODEL_FALLBACK, HARNESS, HARNESS_CMD, ROUTES, MIX, PANEL, RETRIES, TIMEOUT, BACKOFF, PARALLEL, MAX_CALLS, RESEARCH, AGENDA, FACTCHECK, SPECS, REVIEW (SDD and backlog audits), CARDS, REPAIR, FRESH.
 EOF
 }
 

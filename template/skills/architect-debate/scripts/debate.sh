@@ -9,7 +9,7 @@
 #      rate limit; then the other MIX harnesses and HARNESS; the run fails only when none is left),
 #      BACKOFF=20 (s, doubles on every wait), PARALLEL=6 (simultaneous calls, 0 = no cap), MAX_CALLS=0 (run cap, 0 = no cap),
 #      FROM=<phase> (archives that phase and the later ones in raw/archive and redoes them),
-#      FRESH=0, AGENDA=1, REVIEW=1, RESEARCH=1, FACTCHECK=1, SPECS=1, REPAIR=1,
+#      FRESH=0, AGENDA=1, REVIEW=1 (SDD and backlog audits), RESEARCH=1, FACTCHECK=1, SPECS=1, CARDS=1, REPAIR=1,
 #      PANEL="debate-arch debate-ux debate-pm debate-design" (empty = meta.txt or picked by the brief; debate-arch, debate-ux and debate-pm always join),
 #      MIX="claude codex" (panel spread across harnesses), ROUTES="debate-arch=claude debate-design=codex:gpt-5" (route per agent),
 #      HARNESS_CMD (HARNESS=custom: a command that reads $PROMPT and $MODEL and prints the answer).
@@ -34,6 +34,7 @@ RESEARCH="${RESEARCH:-1}"
 FACTCHECK="${FACTCHECK:-1}"
 REPAIR="${REPAIR:-1}"
 SPECS="${SPECS:-1}"
+CARDS="${CARDS:-1}"
 HARNESS="${HARNESS:-opencode}"
 MIX="${MIX:-}"
 ROUTES="${ROUTES:-}"
@@ -63,7 +64,7 @@ n=0; for a in $PANEL; do
   [ -f "$SCRIPT_DIR/../personas/$a.md" ] || { echo "error: unknown persona on the panel: $a" >&2; exit 2; }
 done
 [ "$n" -ge 2 ] || { echo "error: PANEL needs 2+ agents" >&2; exit 2; }
-PHASES="research agenda proposal critique factcheck rebuttal decision sdd brand specs backlog"
+PHASES="research agenda proposal critique factcheck rebuttal decision sdd brand specs backlog cards"
 if [ -n "$FROM" ]; then
   case " $PHASES " in *" $FROM "*) ;; *) echo "error: invalid --from: $FROM ($PHASES)" >&2; exit 2 ;; esac
 fi
@@ -158,6 +159,7 @@ archive_from() {
       brand) l="BRANDBOOK.md" ;;
       specs) l="specs checklists" ;;
       backlog) l="backlog BACKLOG.md backlog.csv backlog.json backlog-gh.sh" ;;
+      cards) l="backlog/cards BACKLOG-DETAILED.md" ;;
     esac
     for x in $l; do
       [ -e "$OUT/$x" ] || continue
@@ -169,7 +171,7 @@ archive_from() {
 [ -z "$FROM" ] || archive_from "$FROM"
 
 mkdir -p "$OUT/proposals" "$OUT/critiques" "$OUT/adr"
-for t in debate-rules.md visual-contract.md research-template.md agenda-template.md adr-template.md backlog-template.md polish.md sdd-template.md spec-template.md plan-template.md tasks-template.md audit-template.md brandbook-template.md; do
+for t in debate-rules.md visual-contract.md research-template.md agenda-template.md adr-template.md backlog-template.md polish.md completeness.md sdd-template.md spec-template.md plan-template.md tasks-template.md audit-template.md brandbook-template.md; do
   [ -f "$OUT/$t" ] || cp "$REF/$t" "$OUT/$t"
 done
 { grep -v '^panel:\|^harness:\|^rounds:' "$OUT/meta.txt" 2>/dev/null || true; printf 'panel: %s\nharness: %s\nrounds: %s\n' "$PANEL" "$HARNESS" "$ROUNDS"; } > "$OUT/meta.txt.tmp"
@@ -575,6 +577,63 @@ if [ "$SPECS_OK" = "1" ]; then
   if need "$OUT/BACKLOG.md"; then run_agent debate-pm "$T" "$OUT/BACKLOG.md" "$OUT/raw/f8-backlog.json" || abort "pm backlog"; else log "reuse $OUT/BACKLOG.md"; fi
   gate_one backlog debate-pm "$OUT/BACKLOG.md" "$T" "$OUT/raw/f8-backlog.json" || abort "backlog gate"
   "$SCRIPT_DIR/backlog-export.sh" "$OUT" | tee -a "$SUMMARY"
+
+  # phase 8b - completeness: an independent audit, from an empty repository to an operated product. Each gap becomes an item.
+  if [ "$REVIEW" = "1" ]; then
+    TB="phase backlog-audit: read brief.md, SDD.md, adr/, specs/*/spec.md, BACKLOG.md and completeness.md; reply only with backlog/audit.md in the audit format of completeness.md"
+    if need "$OUT/backlog/audit.md"; then
+      run_agent debate-auditor "$TB" "$OUT/backlog/audit.md" "$OUT/raw/f8b-audit.json" || log "backlog audit failed, the backlog goes on without it"
+    else log "reuse $OUT/backlog/audit.md"; fi
+    if [ -s "$OUT/backlog/audit.md" ]; then
+      gate_one completeness debate-auditor "$OUT/backlog/audit.md" "$TB" "$OUT/raw/f8b-audit.json" || abort "completeness gate"
+      if grep -q '^Verdict: GAPS' "$OUT/backlog/audit.md"; then
+        log "completeness: $(grep -cE '^\|[ *]*G[0-9]+[ *]*\|' "$OUT/backlog/audit.md") gap(s), adding them to the backlog"
+        TF="phase backlog-fix: read backlog/audit.md, BACKLOG.md, brief.md, SDD.md, adr/, specs/*/tasks.md, polish.md and backlog-template.md; add the items of every Gn row and reply only with the full BACKLOG.md"
+        run_agent debate-pm "$TF" "$OUT/BACKLOG.md" "$OUT/raw/f8b-fix.json" || abort "backlog fix"
+        gate_one backlog debate-pm "$OUT/BACKLOG.md" "$TF" "$OUT/raw/f8b-fix.json" || abort "backlog gate after completeness"
+        sed 's/^Verdict: GAPS/Verdict: APPLIED/' "$OUT/backlog/audit.md" > "$OUT/backlog/audit.md.n"; mv "$OUT/backlog/audit.md.n" "$OUT/backlog/audit.md"
+        "$SCRIPT_DIR/backlog-export.sh" "$OUT" | tee -a "$SUMMARY"
+      fi
+    fi
+  fi
+
+  # phase 8c - cards: what to build and how, 1 card per item before Post-launch. Groups of up to 10 items of a phase
+  # run in parallel and read only the specs their items cite.
+  if [ "$CARDS" = "1" ]; then
+    mkdir -p "$OUT/backlog/cards"
+    TAB="$(printf '\t')"; G="$OUT/raw/card-groups"
+    card_groups "$OUT" > "$G"
+    BBc=""; [ -s "$OUT/BRANDBOOK.md" ] && BBc=", BRANDBOOK.md"
+    cards_task() {
+      printf 'phase cards: write the cards of items %s (%s) of BACKLOG.md; read BACKLOG.md, SDD.md, adr/, %sbacklog-template.md (Card format)%s; reply only with the cards' \
+        "$1" "$2" "$(for x in $3; do printf '%s, ' "$x"; done)" "$BBc"
+    }
+    while IFS="$TAB" read -r n ph ids sp; do
+      d="$OUT/backlog/cards/$n.md"
+      if [ "$FRESH" != "1" ] && [ -z "$(check_cards "$d" "$ids")" ]; then log "reuse $d"; continue; fi
+      launch debate-arch "$(cards_task "$ids" "$ph" "$sp")" "$d" "$OUT/raw/f8c-$n.json" force
+    done < "$G"
+    wait_all "cards phase" || abort "cards phase"
+    bad=""
+    while IFS="$TAB" read -r n ph ids sp; do
+      d="$OUT/backlog/cards/$n.md"; r="$(check_cards "$d" "$ids")"
+      [ -n "$r" ] || continue
+      log "gate cards failed on backlog/cards/$n.md: $r"
+      [ "$REPAIR" = "1" ] || abort "cards gate"
+      bad="$bad $n"
+      launch debate-arch "$(repair "$(cards_task "$ids" "$ph" "$sp")" "$d" "$r")" "$d" "$OUT/raw/f8c-$n-repair.json" force
+    done < "$G"
+    if [ -n "$bad" ]; then
+      wait_all "cards repair" || true
+      while IFS="$TAB" read -r n ph ids sp; do
+        r="$(check_cards "$OUT/backlog/cards/$n.md" "$ids")"
+        [ -z "$r" ] || abort "cards gate after repair on backlog/cards/$n.md: $r"
+      done < "$G"
+    fi
+    merge_cards "$OUT"
+    "$SCRIPT_DIR/backlog-export.sh" "$OUT" > /dev/null
+    log "cards gate ok: $(grep -c '^### B' "$OUT/BACKLOG-DETAILED.md") card(s) in BACKLOG-DETAILED.md"
+  fi
 fi
 
 metrics() {
@@ -588,5 +647,5 @@ metrics() {
 }
 log "$(metrics)"
 log "debate ok: decision.md, adr/, SDD.md, style-tile.html$([ -s "$OUT/BRANDBOOK.md" ] && printf ', BRANDBOOK.md') in $OUT"
-if [ "$SPECS_OK" = "1" ]; then log "backlog ok: BACKLOG.md, backlog.csv, backlog.json, backlog-gh.sh"
+if [ "$SPECS_OK" = "1" ]; then log "backlog ok: BACKLOG.md$([ -s "$OUT/BACKLOG-DETAILED.md" ] && printf ', BACKLOG-DETAILED.md'), backlog.csv, backlog.json, backlog-gh.sh"
 else log "next: fill the specs (make-specs.sh, with SPECS=0) and run debate.sh again for phase 8 (backlog)"; fi

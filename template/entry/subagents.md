@@ -10,6 +10,6 @@ Read `{{SKILL_DIR}}/SKILL.md` and follow it, session mode, without skipping the 
 How to delegate in {{HARNESS_NAME}}: {{DELEGATE}} The specialists are `debate-research`, `debate-scout`, `debate-judge`, `debate-auditor`, the base seats `debate-arch`, `debate-ux` and `debate-pm`, and the optional seats `debate-design`, `debate-brand`, `debate-sec`, `debate-ai`, `debate-data`, `debate-mobile`, `debate-gcp`, `debate-aws` and `debate-k8s`. Where SKILL.md says Task, use this mechanism.
 
 {{DELEGATION}}
-Options the user may pass: `--panel design,brand,sec` `--rounds 1-3` `--no-research` `--no-factcheck`.
+Options the user may pass: `--panel design,brand,sec` `--rounds 1-3` `--no-research` `--no-factcheck` `--no-audit` `--no-cards`.
 
 Idea to debate: {{ARGS}}

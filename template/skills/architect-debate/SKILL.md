@@ -38,7 +38,7 @@ Panel: `debate-arch`, `debate-ux` and `debate-pm` always sit. The optional seats
 
 Adjust by what the brief means, not only by the word (ex: a product without screens drops `design`; an idea going public adds `brand`), save with `$S/panel.sh <case> --save <agents>` and state the panel in 1 line. Cap of 8 seats.
 Design roles: debate-design decides what each screen holds (flows, inventory, wireframes, states); debate-ux reviews those screens in the critique (`## Review debate-design`) and owns usability, accessibility and the UI system; debate-brand creates the brand and TOKENS and, after the SDD, writes BRANDBOOK.md adapting the screens to the brand. Without debate-brand, TOKENS belongs to debate-ux.
-Options: `--panel design,brand` becomes `$S/panel.sh <case> --save design brand` (the base seats join on their own); `--rounds N` cuts phases (1 = proposal only, 2 = +critique and fact-check, 3 = +rebuttal); `--no-research` writes `research.md` with `skipped: ...`; `--no-factcheck` skips phase 4.
+Options: `--panel design,brand` becomes `$S/panel.sh <case> --save design brand` (the base seats join on their own); `--rounds N` cuts phases (1 = proposal only, 2 = +critique and fact-check, 3 = +rebuttal); `--no-research` writes `research.md` with `skipped: ...`; `--no-factcheck` skips phase 4; `--no-audit` skips the SDD and backlog audits; `--no-cards` skips the cards.
 
 Phases 1-6, each row is 1 wave of Tasks. `reads` and `writes` go in the Task prompt, with the case's absolute path:
 
@@ -62,7 +62,9 @@ Phase 7, specs: `$S/make-specs.sh <case> <slugs from the decision.md index>`; 1 
 
 Phase 8, backlog to the polished product:
 1. Wave in parallel: debate-ux `phase backlog-design` writes `backlog/design.md`; debate-arch `phase backlog-eng` writes `backlog/eng.md`. Both read SDD.md, adr/, specs/, polish.md, backlog-template.md and, if it exists, BRANDBOOK.md. Gate: `$S/gate.sh <case> tracks`.
-2. debate-pm `phase backlog` writes `BACKLOG.md` (reads the 2 drafts, SDD, ADRs, specs/*/tasks.md, BRANDBOOK.md if it exists, polish.md, backlog-template.md). Gate: `$S/gate.sh <case> backlog` (coverage of every polish.md tag, every spec and every ADR, acyclic dependencies, S/M/L estimate, DoD, capacity); once approved it exports `backlog.csv` (Jira/Linear/GitHub Projects), `backlog.json` and `backlog-gh.sh` (review before running) and prints days per phase and the critical path.
+2. debate-pm `phase backlog` writes `BACKLOG.md` (reads the 2 drafts, SDD, adr/, specs/*/tasks.md, BRANDBOOK.md if it exists, polish.md, backlog-template.md). Gate: `$S/gate.sh <case> backlog` (coverage of every polish.md tag, every spec and every ADR, acyclic dependencies, S/M/L estimate, DoD, capacity); once approved it exports `backlog.csv` (Jira/Linear/GitHub Projects), `backlog.json` and `backlog-gh.sh` (review before running) and prints days per phase and the critical path.
+3. Completeness, from an empty repository to a launched, operated product: debate-auditor `phase backlog-audit` writes `backlog/audit.md` (reads brief.md, SDD.md, adr/, specs/*/spec.md, BACKLOG.md, completeness.md). Gate: `$S/gate.sh <case> completeness` (1 row per stage, cited items exist). `Verdict: GAPS`: debate-pm `phase backlog-fix` re-emits BACKLOG.md with the items of every Gn row (reads backlog/audit.md, BACKLOG.md, brief.md, SDD.md, adr/, specs/*/tasks.md, polish.md, backlog-template.md) and `gate.sh <case> backlog` runs again. Skipped with `--no-audit`.
+4. Cards, what to build and how: `$S/gate.sh <case> card-groups` prints `nn | phase | items | spec folders`, groups of up to 10 items before Post-launch. 1 Task per group in parallel: debate-arch `phase cards`, naming the items and the phase, reads BACKLOG.md, SDD.md, adr/, the group's spec folders, backlog-template.md (Card format) and BRANDBOOK.md if it exists, writes `backlog/cards/<nn>.md`. Gate: `$S/gate.sh <case> cards` (every item has a card with What, How in 2+ steps, Files, Done when in Given/When/Then and Test); once approved it merges `BACKLOG-DETAILED.md` and exports again, with each card in the CSV and the issue body.
 
 Phase 9, delivery in chat (max 16 lines, in the user's language; artifact names and ids as they are):
 
@@ -75,6 +77,7 @@ Panel: <agents>
 Visual direction: <concept> - <display>/<body>, accent <hex>; open style-tile.html (and BRANDBOOK.md with debate-brand)
 Specs: <NN slug, ...>
 Backlog: <N items, D days, fits|cut at <deadline>>; critical path <Bxx -> ...>; BACKLOG.md and backlog.csv
+Detail: <N cards in BACKLOG-DETAILED.md>; completeness <complete | N gaps added>
 Dissent that may reopen: <1 line>
 Open questions: <max 3, with a default>
 ```
@@ -92,7 +95,7 @@ $S/gate.sh <case> status          # where it stopped, next phase, stale outputs,
 FROM=critique HARNESS=<id> $S/debate.sh <case>   # archives critique onward and redoes it
 ```
 
-Env: `HARNESS`, `MODEL` (empty = harness default), `MODEL_FALLBACK` (list tried in order when a model runs out of quota: `model`, `harness:model` or `harness:`; then the `MIX` harnesses; fails only with none left), `MIX`, `ROUTES` (`debate-arch=claude debate-ux=codex:<model>`), `HARNESS_CMD` (with `HARNESS=custom`), `RETRIES=2`, `TIMEOUT=600` s per call, `BACKOFF=20` s, `PARALLEL=6`, `MAX_CALLS=0` (no cap), `MIN_LINES=5`, `PANEL` (empty = meta.txt or the brief; the base always joins), `FROM`, `RESEARCH=1`, `AGENDA=1`, `FACTCHECK=1`, `SPECS=1`, `REVIEW=1` (audit), `REPAIR=1`, `FRESH=0`, `OVERWRITE=0`.
+Env: `HARNESS`, `MODEL` (empty = harness default), `MODEL_FALLBACK` (list tried in order when a model runs out of quota: `model`, `harness:model` or `harness:`; then the `MIX` harnesses; fails only with none left), `MIX`, `ROUTES` (`debate-arch=claude debate-ux=codex:<model>`), `HARNESS_CMD` (with `HARNESS=custom`), `RETRIES=2`, `TIMEOUT=600` s per call, `BACKOFF=20` s, `PARALLEL=6`, `MAX_CALLS=0` (no cap), `MIN_LINES=5`, `PANEL` (empty = meta.txt or the brief; the base always joins), `FROM`, `RESEARCH=1`, `AGENDA=1`, `FACTCHECK=1`, `SPECS=1`, `REVIEW=1` (SDD and backlog audits), `CARDS=1`, `REPAIR=1`, `FRESH=0`, `OVERWRITE=0`.
 
 ## Models
 

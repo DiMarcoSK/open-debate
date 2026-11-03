@@ -243,6 +243,8 @@ chaves_no_titulo() {
   "$CLI" gate "$c" backlog
 }
 tp "backlog fails a dependency cycle" ciclo
+tp "cards gate checks every item and merges in order" cards_gate
+tp "completeness gate checks stages and cited items" completude_gate
 tp "backlog accepts braces in the item text" chaves_no_titulo
 
 # Every gate fails what it promises to fail.
@@ -251,6 +253,30 @@ caso_completo() {
   cp "$FX/research.md" "$c/research.md"; cp "$FX/agenda.md" "$c/agenda.md"
   for a in arch ux pm design brand gcp k8s sec aws data ai mobile; do cp "$FX/proposal-$a.md" "$c/proposals/debate-$a.md"; done
   printf '%s' "$c"
+}
+cards_gate() {
+  c="$(novo_caso)"; cp "$FX/BACKLOG.md" "$c/BACKLOG.md"; mkdir -p "$c/backlog/cards"
+  "$CLI" gate "$c" card-groups > "$WORK/g"
+  grep -q '^01 | Phase 0 - Foundation (week 1) | B01 B02 B03 |' "$WORK/g"
+  [ "$(wc -l < "$WORK/g" | tr -d ' ')" = "4" ]
+  for n in 01 02 03 04; do cp "$FX/cards.md" "$c/backlog/cards/$n.md"; done
+  "$CLI" gate "$c" cards
+  [ "$(grep -c '^### B' "$c/BACKLOG-DETAILED.md")" = "16" ]
+  grep -q '^## Phase 2 - Polish' "$c/BACKLOG-DETAILED.md"
+  sed '/^- Test:/d' "$FX/cards.md" | sed '/^### B02/,/^$/d' > "$c/backlog/cards/01.md"
+  reprova 'no card for B02' "$c" cards
+  reprova 'B01 without Test' "$c" cards
+}
+completude_gate() {
+  c="$(novo_caso)"; cp "$FX/BACKLOG.md" "$c/BACKLOG.md"; mkdir -p "$c/backlog"
+  cp "$FX/backlog-audit.md" "$c/backlog/audit.md"
+  "$CLI" gate "$c" completeness
+  sed 's/| B16 |/| B42 |/' "$FX/backlog-audit.md" > "$c/backlog/audit.md"
+  reprova 'cites B42, missing from BACKLOG.md' "$c" completeness
+  sed '/^| 13 /d' "$FX/backlog-audit.md" > "$c/backlog/audit.md"
+  reprova '12 stage row(s), expected 13' "$c" completeness
+  sed 's/^Verdict: COMPLETE/Verdict: GAPS/' "$FX/backlog-audit.md" > "$c/backlog/audit.md"
+  reprova 'GAPS without a | Gn | row' "$c" completeness
 }
 reprova() { # reprova <motivo> <gate args...>
   mot="$1"; shift
@@ -454,7 +480,30 @@ e2e() {
   [ -s "$c/backlog-gh.sh" ]
   [ "$(jq length "$c/backlog.json")" = "17" ]
   sh -n "$c/backlog-gh.sh"
+  grep -q '^Verdict: COMPLETE' "$c/backlog/audit.md"
+  [ "$(grep -c '^### B' "$c/BACKLOG-DETAILED.md")" = "16" ]
+  nao grep -q '^### B17' "$c/BACKLOG-DETAILED.md"
+  jq -e '(.[0].card | test("How:")) and .[16].card == null' "$c/backlog.json"
+  grep -q 'Given staging is up' "$c/backlog-gh.sh"
+  "$CLI" status "$c" > "$WORK/s"
+  grep -q '^completeness *ok' "$WORK/s"
+  grep -q '^cards *ok 16 card' "$WORK/s"
   "$CLI" validate "$c"
+}
+# A gap found by the completeness audit becomes a backlog item once; a rerun does not fix it again.
+lacuna_vira_item() {
+  c="$(novo_caso)"
+  SPECS=0 MODEL=stub/modelo "$CLI" run "$c" 1
+  "$CLI" specs "$c" ingestion triage report > /dev/null
+  for d in "$c"/specs/*/; do cp "$FX/spec.md" "$FX/plan.md" "$FX/tasks.md" "$d"; done
+  log="$WORK/gap.log"; : > "$log"
+  STUB_LOG="$log" STUB_BACKLOG_AUDIT=backlog-audit-gaps.md SPECS=0 MODEL=stub/modelo "$CLI" run "$c" 1
+  grep -q 'phase backlog-fix' "$log"
+  grep -q '^Verdict: APPLIED' "$c/backlog/audit.md"
+  grep -q 'completeness: 1 gap(s)' "$c/raw/summary.log"
+  : > "$log"
+  STUB_LOG="$log" STUB_BACKLOG_AUDIT=backlog-audit-gaps.md SPECS=0 MODEL=stub/modelo "$CLI" run "$c" 1
+  nao grep -q 'phase backlog-fix\|phase cards' "$log"
 }
 retoma() {
   c="$(novo_caso)"
@@ -714,6 +763,7 @@ painel_de_marca() {
   )
 }
 tp "full protocol up to the backlog" e2e
+tp "completeness gap becomes a backlog item once" lacuna_vira_item
 tp "rebuttal only for vetoed agents" replica_so_de_vetado
 tp "audit with a defect fixes once" auditoria_corrige
 tp "approved audit does not re-emit the SDD" auditoria_aprova_sem_reemitir

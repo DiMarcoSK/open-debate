@@ -6,7 +6,7 @@ IDEA="${1:?usage: new-debate.sh \"your idea\" [dest-cases]}"
 BASE="${2:-cases}"
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 REF="$SCRIPT_DIR/../references"
-COPIES="sdd-template.md debate-rules.md visual-contract.md research-template.md adr-template.md agenda-template.md audit-template.md backlog-template.md polish.md spec-template.md plan-template.md tasks-template.md brandbook-template.md"
+COPIES="sdd-template.md debate-rules.md visual-contract.md research-template.md adr-template.md agenda-template.md audit-template.md backlog-template.md polish.md completeness.md spec-template.md plan-template.md tasks-template.md brandbook-template.md"
 for f in brief-template.md constitution-template.md $COPIES; do
   [ -f "$REF/$f" ] || { echo "error: missing reference: $REF/$f" >&2; exit 2; }
 done

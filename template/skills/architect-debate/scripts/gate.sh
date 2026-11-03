@@ -1,9 +1,10 @@
 #!/bin/sh
 # gate.sh <case> <phase> [agent...] - the gate of 1 phase, for the session mode orchestrator.
-# Phases: brief research agenda proposal critique decision sdd audit brand specs tracks backlog. Prints OK/FAILED per file, exits 1 if anything failed.
+# Phases: brief research agenda proposal critique decision sdd audit brand specs tracks backlog completeness cards. Prints OK/FAILED per file, exits 1 if anything failed.
 # status prints the state of each phase and the next one; vetoed lists who needs a rebuttal.
 # An approved decision splits the ADRs into adr/; an approved sdd generates style-tile.html, tokens.json and tokens.css;
-# an approved backlog exports backlog.csv, backlog.json and backlog-gh.sh.
+# an approved backlog exports backlog.csv, backlog.json and backlog-gh.sh; card-groups lists the groups of the cards phase,
+# and approved cards are merged into BACKLOG-DETAILED.md and exported again.
 set -eu
 export LC_ALL=C
 CASE_DIR="${1:?usage: gate.sh <case> <phase> [agent...]}"
@@ -40,6 +41,21 @@ case "$PHASE" in
   backlog)
     one backlog debate-pm "$CASE_DIR/BACKLOG.md"
     [ "$FAIL" -eq 0 ] && "$SCRIPT_DIR/backlog-export.sh" "$CASE_DIR" ;;
-  *) echo "unknown phase: $PHASE (brief research agenda proposal critique decision sdd audit brand specs tracks backlog vetoed status)" >&2; exit 2 ;;
+  completeness) one completeness debate-auditor "$CASE_DIR/backlog/audit.md" ;;
+  card-groups) card_groups "$CASE_DIR" | awk -F'\t' '{ printf "%s | %s | %s | %s\n", $1, $2, $3, $4 }' ;;
+  cards)
+    [ -s "$CASE_DIR/BACKLOG.md" ] || { echo "FAILED cards: BACKLOG.md missing"; exit 1; }
+    card_groups "$CASE_DIR" > "$CASE_DIR/.groups.tmp"
+    while IFS="$(printf '\t')" read -r n ph ids sp; do
+      r="$(check_cards "$CASE_DIR/backlog/cards/$n.md" "$ids")"
+      if [ -z "$r" ]; then printf 'OK cards backlog/cards/%s.md\n' "$n"
+      else printf 'FAILED cards debate-arch backlog/cards/%s.md: %s\n' "$n" "$r"; FAIL=1; fi
+    done < "$CASE_DIR/.groups.tmp"
+    rm -f "$CASE_DIR/.groups.tmp"
+    if [ "$FAIL" -eq 0 ]; then
+      merge_cards "$CASE_DIR"; "$SCRIPT_DIR/backlog-export.sh" "$CASE_DIR" > /dev/null
+      printf 'BACKLOG-DETAILED.md: %s card(s)\n' "$(grep -c '^### B' "$CASE_DIR/BACKLOG-DETAILED.md")"
+    fi ;;
+  *) echo "unknown phase: $PHASE (brief research agenda proposal critique decision sdd audit brand specs tracks backlog completeness card-groups cards vetoed status)" >&2; exit 2 ;;
 esac
 exit "$FAIL"
