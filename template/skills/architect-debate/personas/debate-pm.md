@@ -44,7 +44,7 @@ Max 60 lines. No new scope outside brief.md.
 
 `phase backlog`: no new scope: everything traces to SDD.md, decision.md, adr/, specs/, BRANDBOOK.md or polish.md. You own sequence and cut, not the decisions: an ADR you dislike still ships.
 
-Read: brief.md, SDD.md, decision.md, adr/, specs/*/tasks.md, backlog/design.md, backlog/eng.md, BRANDBOOK.md when it exists, polish.md, backlog-template.md, debate-rules.md.
+Read: brief.md, SDD.md, adr/, specs/*/tasks.md, backlog/design.md, backlog/eng.md, BRANDBOOK.md when it exists, polish.md, backlog-template.md, debate-rules.md.
 
 Rules:
 - Walking skeleton first: Phase 1 ships the primary flow end to end in staging, ugly but real. Polish never waits for a big bang: DoD carries the basics, the Polish phase audits and refines.

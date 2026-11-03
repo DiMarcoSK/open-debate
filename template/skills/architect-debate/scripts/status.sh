@@ -58,5 +58,9 @@ else echo 'next: no phase left, but validate fails: run open-debate validate'; f
 stale "$CASE_DIR" | sed 's/^/warning: /'
 M="$CASE_DIR/raw/metrics.tsv"
 if [ -s "$M" ]; then
-  awk -F'\t' '{ n++; s += $3; rep += ($1 ~ /repair/); if ($3 > m) { m = $3; q = $1 } } END { printf "cost: %d calls, %d s of model time, %d repair(s); the slowest was %s (%d s)\n", n, s, rep, q, m }' "$M"
+  # Tokens per phase, from the call tag (f2-arch -> f2): where a cheaper model or a skipped phase saves the most.
+  awk -F'\t' '{ n++; s += $3; rep += ($1 ~ /repair/); if ($3 > m) { m = $3; q = $1 }
+      if ($7 ~ /^[0-9]+$/) { k++; t = $7 + $8; tt += t; p = $1; sub(/-.*/, "", p); if (!(p in pt)) o[++np] = p; pt[p] += t } }
+    END { printf "cost: %d calls, %d s of model time, %d repair(s); the slowest was %s (%d s)\n", n, s, rep, q, m
+          if (k) { printf "tokens: %d over %d call(s) with usage;", tt, k; for (i = 1; i <= np; i++) printf " %s %d%%", o[i], 100 * pt[o[i]] / tt; print "" } }' "$M"
 fi

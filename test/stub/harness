@@ -59,7 +59,7 @@ else
   fi
 fi
 case "$nome" in
-  claude|cursor-agent|droid) printf '%s' "$texto" | jq -Rs '{type:"result",is_error:false,result:.}' -c ;;
+  claude|cursor-agent|droid) printf '%s' "$texto" | jq -Rs '{type:"result",is_error:false,result:.,usage:{input_tokens:900,cache_read_input_tokens:0,output_tokens:100}}' -c ;;
   gemini|agy) printf '%s' "$texto" | jq -Rs '{response:.,stats:{}}' -c ;;
   qwen) printf '%s' "$texto" | jq -Rs '[{type:"system"},{type:"result",result:.}]' -c ;;
   codex) printf '%s\n' "$texto" > "$fim"; echo "progress that is not the answer" ;;

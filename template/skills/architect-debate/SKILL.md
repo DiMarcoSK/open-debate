@@ -51,14 +51,14 @@ Phases 1-6, each row is 1 wave of Tasks. `reads` and `writes` go in the Task pro
 | 4 fact-check | debate-research, `phase fact-check` | proposals/, critiques/, research-template.md | research-check.md | does not block |
 | 5 rebuttal | only the agents listed by `gate.sh <case> vetoed` | brief.md, research.md, research-check.md, own proposal, vetoes against it, rivals | proposals/<agent>-r2.md | does not block |
 | 6a decision | debate-judge, `phase decision` | everything above, adr-template.md | decision.md | `gate.sh <case> decision` (splits adr/) |
-| 6b SDD | debate-judge, `phase sdd` | decision.md, adr/, sdd-template.md, visual-contract.md | SDD.md | `gate.sh <case> sdd` (generates style-tile.html, tokens.json, tokens.css) |
-| 6c audit | debate-auditor, `phase audit` | SDD.md, brief.md, constitution.md, decision.md, adr/, research-check.md, audit-template.md | audit.md | `gate.sh <case> audit`; `Verdict: FIX`: debate-judge `phase fix` re-emits the SDD and the sdd gate runs again |
+| 6b SDD | debate-judge, `phase sdd` | brief.md, constitution.md, research.md, decision.md, sdd-template.md, visual-contract.md | SDD.md | `gate.sh <case> sdd` (generates style-tile.html, tokens.json, tokens.css) |
+| 6c audit | debate-auditor, `phase audit` | SDD.md, brief.md, constitution.md, decision.md, research-check.md, audit-template.md | audit.md | `gate.sh <case> audit`; `Verdict: FIX`: debate-judge `phase fix` re-emits the SDD and the sdd gate runs again |
 | 6d brand (only with debate-brand) | debate-brand, `phase brand` | brief.md, SDD.md, decision.md, proposals/debate-brand(-r2).md, proposals/debate-design.md, critiques/debate-ux.md, brandbook-template.md, visual-contract.md | BRANDBOOK.md | `gate.sh <case> brand` |
 
 Failed gate: 1 repair Task to the same agent with `FIX: <gate reason>`; fails again, stop and report. A provider failure (quota, usage limit, persistent 429) is not a gate failure: follow the model fallback of the delegation contract (`$S/models.sh next <case> <agent>` in opencode) and stop only when no model is left. An existing case resumes: `$S/gate.sh <case> status` shows each phase, the next one and stale outputs.
 In phases 2 and 3, the Task prompt names only the files in the Reads column: an agent that does not get a rival's path stays blind.
 
-Phase 7, specs: `$S/make-specs.sh <case> <slugs from the decision.md index>`; 1 Task per spec in parallel (debate-arch, `phase spec`, for spec/plan/tasks; debate-design, or debate-ux without design on the panel, fills spec section 6 when there is UI), then `$S/gate.sh <case> specs`, repair at the source until zero.
+Phase 7, specs: `$S/make-specs.sh <case> <slugs from the decision.md index>`; 1 Task per spec in parallel (debate-arch, `phase spec`, with the spec's index line from decision.md as its scope in the prompt; reads brief.md, SDD.md, adr/, visual-contract.md and the 3 templates, not decision.md; for spec/plan/tasks; debate-design, or debate-ux without design on the panel, fills spec section 6 when there is UI), then `$S/gate.sh <case> specs`, repair at the source until zero.
 
 Phase 8, backlog to the polished product:
 1. Wave in parallel: debate-ux `phase backlog-design` writes `backlog/design.md`; debate-arch `phase backlog-eng` writes `backlog/eng.md`. Both read SDD.md, adr/, specs/, polish.md, backlog-template.md and, if it exists, BRANDBOOK.md. Gate: `$S/gate.sh <case> tracks`.

@@ -54,8 +54,8 @@ The task names the phase:
 8. Dissent
 9. Vetoes: section `## Vetoes`, 1 row per veto (`| target agent | veto | upheld or rejected | reason |`) and 1 row per `wrong` claim from research-check.md (`| wrong | claim | zeroed on <criterion> |`)
 
-`phase sdd`: write SDD.md following sdd-template.md and visual-contract.md, opening with the 5-line Summary. No empty section, no placeholder, an unconfirmed assumption carries `[assumed, owner <name>, <week>]`. Copy TOKENS from decision.md literally. List every ADR of adr/ in section 3.
+`phase sdd`: write SDD.md following sdd-template.md and visual-contract.md, opening with the 5-line Summary. No empty section, no placeholder, an unconfirmed assumption carries `[assumed, owner <name>, <week>]`. Copy TOKENS from decision.md literally. List every ADR of decision.md in section 3.
 
-`phase fix`: apply each An row of audit.md to SDD.md and re-emit the full SDD.md. Change only what a row names. Where a row is wrong, keep the text and add 1 line to section 8 saying why.
+`phase fix`: read audit.md, SDD.md, brief.md and decision.md; apply each An row of audit.md to SDD.md and re-emit the full SDD.md. Change only what a row names. Where a row is wrong, keep the text and add 1 line to section 8 saying why.
 
 Execution: follow debate-rules.md, section Execution (write the file named in `writes:`, reply `OK <file>`; use debate-scout for facts research.md does not cover).

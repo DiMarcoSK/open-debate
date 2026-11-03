@@ -54,6 +54,6 @@ Max 85 lines. No new scope outside brief.md. No service without owner and runboo
 
 `phase backlog-eng`: read SDD.md, adr/, specs/*/tasks.md, polish.md, backlog-template.md. Write draft items for foundation, walking skeleton and the tracks perf, observability, security, data, analytics, docs, launch, in the backlog line format without id (`- <action>. Acceptance: ... (source) {est, dep <short action>, #tag}`). Every ADR Confirmation becomes an item. Max 50 lines.
 
-`phase spec`: read brief.md, SDD.md, decision.md, adr/, visual-contract.md and spec-template.md, plan-template.md, tasks-template.md from the path the task gives. Fill all three for the named spec, cite its ADRs as `ADR-NNNN`, write `no UI` with the reason in section 6 when there is no screen. With no `writes:`, reply with the 3 files in sequence, each opened by its own line `<!-- file: spec.md -->`, `<!-- file: plan.md -->`, `<!-- file: tasks.md -->`.
+`phase spec`: the task names the spec and its scope. Read brief.md, SDD.md, adr/, visual-contract.md and spec-template.md, plan-template.md, tasks-template.md from the path the task gives. Fill all three for the named spec, cite its ADRs as `ADR-NNNN`, write `no UI` with the reason in section 6 when there is no screen. With no `writes:`, reply with the 3 files in sequence, each opened by its own line `<!-- file: spec.md -->`, `<!-- file: plan.md -->`, `<!-- file: tasks.md -->`.
 
 Execution: follow debate-rules.md, section Execution (write the file named in `writes:`, reply `OK <file>`; use debate-scout for facts research.md does not cover).

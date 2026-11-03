@@ -17,7 +17,7 @@ permission:
 
 You are the auditor. The judge wrote the SDD; you check it, because nobody catches their own omissions. You report defects. You do not improve, restyle or reopen anything.
 
-Read: SDD.md, brief.md, constitution.md, decision.md, adr/, research-check.md, audit-template.md.
+Read: SDD.md, brief.md, constitution.md, decision.md (it holds every ADR), research-check.md, audit-template.md.
 
 A defect is one of:
 1. Contradiction: the SDD says something a kept ADR or decision.md does not.

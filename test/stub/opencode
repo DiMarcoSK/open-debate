@@ -48,3 +48,4 @@ if [ "${FAIL_ONCE:-}" = "$f" ] && [ ! -e "$STUB_STATE.$f" ]; then
 fi
 rival="$(printf '%s' "$task" | grep -Eo 'proposals/debate-[a-z0-9]+' | head -1 | sed 's#proposals/##')"
 if [ "$f" = "critique.md" ] || [ "$f" = "critique-ux.md" ]; then sed "s/debate-gcp/$rival/g" "$FX/$f"; else cat "$FX/$f"; fi | jq -Rs '{type:"text",part:{text:.}}' -c
+echo '{"type":"step_finish","part":{"tokens":{"input":900,"output":100,"reasoning":0,"cache":{"read":0,"write":0}}}}'

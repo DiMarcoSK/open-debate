@@ -108,6 +108,21 @@ h_text() {
   [ -s "$3" ]
 }
 
+# h_tokens <harness> <raw-output>: "<input> <output>" tokens of the call, cache included in the input; nothing when
+# the harness does not report usage in its output (codex, pi, dsh, cline, custom...).
+h_tokens() {
+  [ -s "$2" ] || return 0
+  case "$1" in
+    opencode) jq -rs '[.[] | select(.type == "step_finish" or .type == "step-finish") | .part.tokens // empty]
+      | if length == 0 then empty else
+        [(map((.input // 0) + (.cache.read // 0) + (.cache.write // 0)) | add), (map((.output // 0) + (.reasoning // 0)) | add)] | @tsv end' "$2" ;;
+    claude|cursor|droid) jq -r 'select(.usage != null) | .usage
+      | [(.input_tokens // 0) + (.cache_read_input_tokens // 0) + (.cache_creation_input_tokens // 0), (.output_tokens // 0)] | @tsv' "$2" ;;
+    gemini|agy) jq -r 'select(.stats.models != null) | [.stats.models[] | .tokens // empty]
+      | if length == 0 then empty else [(map(.prompt // 0) | add), (map((.candidates // 0) + (.thoughts // 0)) | add)] | @tsv end' "$2" ;;
+  esac 2>/dev/null | tr '\t' ' ' | head -1 || true
+}
+
 # h_failure <raw-output>: what is left of the output after a failed call. Only the tail: a proposal may talk about rate limits.
 h_failure() { { tail -c 2000 "$1" 2>/dev/null; tail -c 2000 "$1.stderr" 2>/dev/null; } | tr -d '\000'; }
 # Permanent failure: retrying only wastes time. Every harness words it differently.

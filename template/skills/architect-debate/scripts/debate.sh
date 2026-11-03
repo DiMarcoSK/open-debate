@@ -271,8 +271,12 @@ try_agent() {
 agent_call() {
   t0="$(date +%s)"; rc2=0; tries=0; used=""
   try_agent "$@" || rc2=$?
-  b4="${4##*/}"
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "${b4%.json}" "$1" "$(($(date +%s) - t0))" "$tries" "$rc2" "${used%%:*}" >> "$METRICS"
+  b4="${4##*/}"; ti="-"; to="-"
+  if [ "$rc2" -eq 0 ]; then
+    tk="$(h_tokens "${used%%:*}" "$4")"
+    [ -z "$tk" ] || { ti="${tk% *}"; to="${tk#* }"; }
+  fi
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "${b4%.json}" "$1" "$(($(date +%s) - t0))" "$tries" "$rc2" "${used%%:*}" "$ti" "$to" >> "$METRICS"
   return "$rc2"
 }
 
@@ -472,7 +476,7 @@ else log "reuse $OUT/decision.md"; fi
 gate_one decision debate-judge "$OUT/decision.md" "$T" "$OUT/raw/f6-decision.json" || abort "decision gate"
 log "ADRs: $(split_adrs "$OUT") in adr/"
 
-T="phase sdd: read brief.md, constitution.md, research.md, decision.md, adr/, sdd-template.md and visual-contract.md; reply only with the full SDD.md"
+T="phase sdd: read brief.md, constitution.md, research.md, decision.md, sdd-template.md and visual-contract.md; reply only with the full SDD.md"
 if need "$OUT/SDD.md"; then
   run_agent debate-judge "$T" "$OUT/SDD.md" "$OUT/raw/f6-sdd.json" || abort "judge SDD"
 else log "reuse $OUT/SDD.md"; fi
@@ -480,7 +484,7 @@ gate_one sdd debate-judge "$OUT/SDD.md" "$T" "$OUT/raw/f6-sdd.json" || abort "SD
 
 # Independent audit: the author does not catch their own omissions. Short output, and the SDD is re-emitted only on a defect.
 if [ "$REVIEW" = "1" ]; then
-  TA="phase audit: read SDD.md, brief.md, constitution.md, decision.md, adr/, research-check.md and audit-template.md; reply only with audit.md"
+  TA="phase audit: read SDD.md, brief.md, constitution.md, decision.md, research-check.md and audit-template.md; reply only with audit.md"
   # An approved audit is short on purpose.
   MINIMUM=1
   if need "$OUT/audit.md"; then
@@ -493,7 +497,7 @@ if [ "$REVIEW" = "1" ]; then
     MINIMUM=""
     if grep -q '^Verdict: FIX' "$OUT/audit.md"; then
       log "audit: $(grep -cE '^\|[ *]*A[0-9]+[ *]*\|' "$OUT/audit.md") defect(s), fixing the SDD"
-      TC="phase fix: read audit.md, SDD.md, brief.md, decision.md and adr/; apply every An row and reply only with the full corrected SDD.md"
+      TC="phase fix: read audit.md, SDD.md, brief.md and decision.md; apply every An row and reply only with the full corrected SDD.md"
       run_agent debate-judge "$TC" "$OUT/SDD.md" "$OUT/raw/f6-sdd-fix.json" || abort "SDD fix"
       gate_one sdd debate-judge "$OUT/SDD.md" "$TC" "$OUT/raw/f6-sdd-fix.json" || abort "SDD gate after audit"
       sed 's/^Verdict: FIX/Verdict: APPLIED/' "$OUT/audit.md" > "$OUT/audit.md.n"; mv "$OUT/audit.md.n" "$OUT/audit.md"
@@ -520,8 +524,11 @@ fi
 
 # phase 7 - specs: 1 call per item of the decision.md index, in parallel
 spec_pending() { [ ! -s "$1/spec.md" ] || grep -q '<nn>\|<slug>\|<who>' "$1/spec.md"; }
+# The scope comes in the task, from the decision.md index: the spec reads adr/, which holds the ADRs, instead of all of decision.md.
 spec_task() {
-  printf 'phase spec: write spec, plan and tasks for spec %s; read brief.md, SDD.md, decision.md, adr/, visual-contract.md, spec-template.md, plan-template.md and tasks-template.md; reply only with the 3 files, each opened by the line <!-- file: name -->' "${1##*/}"
+  b="${1##*/}"
+  sc="$(grep -m1 "\`${b%%-*} ${b#*-}\`" "$OUT/decision.md" | sed 's/^[-*[:space:]]*//' || true)"
+  printf 'phase spec: write spec, plan and tasks for spec %s (scope: %s); read brief.md, SDD.md, adr/, visual-contract.md, spec-template.md, plan-template.md and tasks-template.md; reply only with the 3 files, each opened by the line <!-- file: name -->' "$b" "${sc:-see SDD.md}"
 }
 spec_split() {
   awk -v d="$1" '
@@ -564,7 +571,7 @@ if [ "$SPECS_OK" = "1" ]; then
   launch debate-ux "phase backlog-design: $READS$BB; reply only with the draft items" "$OUT/backlog/design.md" "$OUT/raw/f8-design.json"
   launch debate-arch "phase backlog-eng: $READS; reply only with the draft items" "$OUT/backlog/eng.md" "$OUT/raw/f8-eng.json"
   wait_all "tracks phase" || abort "tracks phase"
-  T="phase backlog: read brief.md, SDD.md, decision.md, adr/, specs/*/tasks.md, backlog/design.md, backlog/eng.md$BB, polish.md and backlog-template.md; reply only with BACKLOG.md"
+  T="phase backlog: read brief.md, SDD.md, adr/, specs/*/tasks.md, backlog/design.md, backlog/eng.md$BB, polish.md and backlog-template.md; reply only with BACKLOG.md"
   if need "$OUT/BACKLOG.md"; then run_agent debate-pm "$T" "$OUT/BACKLOG.md" "$OUT/raw/f8-backlog.json" || abort "pm backlog"; else log "reuse $OUT/BACKLOG.md"; fi
   gate_one backlog debate-pm "$OUT/BACKLOG.md" "$T" "$OUT/raw/f8-backlog.json" || abort "backlog gate"
   "$SCRIPT_DIR/backlog-export.sh" "$OUT" | tee -a "$SUMMARY"
@@ -573,8 +580,11 @@ fi
 metrics() {
   [ -s "$METRICS" ] || return 0
   awk -F'\t' -v wall="$(($(date +%s) - START))" '
-    { n++; s += $3; rep += ($1 ~ /repair/); ret += ($4 > 1 ? $4 - 1 : 0); if ($3 > m) { m = $3; q = $1 } }
-    END { printf "time: %d s in this run; case history: %d calls, %d s of model time, %d repair(s), %d retry(ies); the slowest was %s (%d s)\n", wall, n, s, rep, ret, q, m }' "$METRICS"
+    { n++; s += $3; rep += ($1 ~ /repair/); ret += ($4 > 1 ? $4 - 1 : 0); if ($3 > m) { m = $3; q = $1 }
+      if ($7 ~ /^[0-9]+$/) { k++; ti += $7; to += $8 } }
+    END { printf "time: %d s in this run; case history: %d calls, %d s of model time, %d repair(s), %d retry(ies); the slowest was %s (%d s)", wall, n, s, rep, ret, q, m
+          if (k) printf "; tokens: %d in, %d out (%d call(s) report usage)", ti, to, k
+          print "" }' "$METRICS"
 }
 log "$(metrics)"
 log "debate ok: decision.md, adr/, SDD.md, style-tile.html$([ -s "$OUT/BRANDBOOK.md" ] && printf ', BRANDBOOK.md') in $OUT"

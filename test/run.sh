@@ -534,6 +534,8 @@ retoma_status() {
   grep -q '^decision *ok' "$WORK/s"
   grep -q '^next: specs$' "$WORK/s"
   grep -q '^cost: ' "$WORK/s"
+  grep -q '^tokens: [0-9]* over [0-9]* call(s) with usage; f1 [0-9]*% f1b [0-9]*% f2 ' "$WORK/s"
+  grep -q 'tokens: [0-9]* in, [0-9]* out' "$c/raw/summary.log"
 }
 status_lista() {
   cd "$WORK"; rm -rf cases

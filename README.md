@@ -122,7 +122,7 @@ open-debate status "$case"              # each phase, the next one, stale output
 open-debate run "$case" --from critique # archives that phase and the later ones in raw/archive, then redoes them
 ```
 
-`raw/metrics.tsv` records time, attempts and outcome per call, so you can see which phase is worth cutting. `Ctrl-C` ends the calls in flight, and a second run on the same case is refused.
+`raw/metrics.tsv` records time, attempts, outcome and tokens per call, and `status` shows the share of tokens per phase, so you can see which phase is worth cutting. See [efficiency](docs/efficiency.md). `Ctrl-C` ends the calls in flight, and a second run on the same case is refused.
 
 ### When a model runs out
 
