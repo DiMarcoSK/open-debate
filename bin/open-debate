@@ -43,6 +43,7 @@ Cases:
   open-debate gate <case> <phase> [agent...] runs the gate of 1 phase
   open-debate validate <case> [--brief]     runs every gate of the case
   open-debate backlog <case>                exports CSV, JSON and a gh script
+  open-debate handoff <case> [agent]        writes HANDOFF.md to start building; in an opencode session, switches to build
   open-debate tile <case> [source.md]       generates style-tile.html and tokens
 
   Run options: --harness x  --mix a,b,c  --fallback model,harness:model  --panel design,brand,sec  --rounds 1-3  --from <phase>
@@ -246,6 +247,7 @@ case "$cmd" in
   gate) need_args "$#" 2; run_script gate.sh "$@" ;;
   validate) need_args "$#" 1; run_script validate.sh "$@" ;;
   backlog) need_args "$#" 1; run_script backlog-export.sh "$@" ;;
+  handoff) need_args "$#" 1; run_script handoff.sh "$@" ;;
   tile) need_args "$#" 1; run_script style-tile.sh "$@" ;;
   *) echo "error: unknown command: $cmd" >&2; usage >&2; exit 2 ;;
 esac

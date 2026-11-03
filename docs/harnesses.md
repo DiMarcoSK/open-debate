@@ -69,6 +69,28 @@ On Claude Code, `debate-scout` is installed with `model: haiku` and the other ag
 
 Parallel calls hit provider limits together. If a run keeps waiting on limits, lower `PARALLEL`.
 
+### Fallback when a model runs out
+
+| Where | How the next model is picked |
+|---|---|
+| `open-debate run` | `--fallback` (`MODEL_FALLBACK`) in order, then the `--mix` harnesses. A route out of quota is skipped for the rest of the run |
+| opencode session | `models.sh next <case> <agent>` gives the next model, passed in the `model` parameter of opencode's subagent tool (opencode 2.x) |
+| other sessions | if the delegation tool takes a model (Claude Code: `sonnet`, `opus`, `haiku`), the orchestrator retries with another one |
+
+On opencode, also keep the orchestrator itself (`debate`) on a model with room to spare: `open-debate models profile mixed <provider/model>` does that. A subagent's fallback cannot save an orchestrator that ran out.
+
+## Hand-off to building
+
+After the delivery, the orchestrator asks whether to start building. On yes, `handoff.sh` writes `HANDOFF.md` in the case: the loop over `BACKLOG.md` and its cards, 1 item at a time, each with its test, its Done when and a commit.
+
+| Harness | What happens |
+|---|---|
+| opencode 2.x | the session switches to the `build` agent (`opencode api session.switchAgent`) and the kickoff is queued, so building starts when the debate turn ends |
+| opencode without the API, or a standalone server | the orchestrator asks you to press Tab, pick `build` and send `follow <case>/HANDOFF.md` |
+| other harnesses | the main session follows `HANDOFF.md` itself |
+
+`open-debate handoff <case>` writes the file again later, with the next open item.
+
 ## Other CLIs
 
 Any CLI with a headless mode works with no code changes. The command receives `$PROMPT` and `$MODEL`, and whatever it prints becomes the answer:

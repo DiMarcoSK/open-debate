@@ -244,6 +244,7 @@ chaves_no_titulo() {
 }
 tp "backlog fails a dependency cycle" ciclo
 tp "cards gate checks every item and merges in order" cards_gate
+tp "handoff writes HANDOFF.md and switches the opencode session to build" passagem
 tp "completeness gate checks stages and cited items" completude_gate
 tp "backlog accepts braces in the item text" chaves_no_titulo
 
@@ -253,6 +254,20 @@ caso_completo() {
   cp "$FX/research.md" "$c/research.md"; cp "$FX/agenda.md" "$c/agenda.md"
   for a in arch ux pm design brand gcp k8s sec aws data ai mobile; do cp "$FX/proposal-$a.md" "$c/proposals/debate-$a.md"; done
   printf '%s' "$c"
+}
+passagem() {
+  c="$(novo_caso)"; cp "$FX/BACKLOG.md" "$c/BACKLOG.md"
+  "$CLI" handoff "$c" > "$WORK/h"
+  grep -q '^next: B01 Provision staging with deploy$' "$WORK/h"
+  grep -q '^agent: manual$' "$WORK/h"
+  grep -q '^Next item: B01 ' "$c/HANDOFF.md"
+  grep -q '^Critical path' "$c/HANDOFF.md"
+  log="$WORK/api.log"; : > "$log"
+  OPENCODE_SESSION_ID=ses_1 STUB_LOG="$log" "$CLI" handoff "$c" > "$WORK/h"
+  grep -q '^agent: switched build, kickoff queued$' "$WORK/h"
+  grep -q 'api session.switchAgent --param sessionID=ses_1 --data {"agent":"build"}' "$log"
+  grep -q 'api session.prompt .*HANDOFF.md.*"delivery":"queue"' "$log"
+  OPENCODE_SESSION_ID=ses_1 STUB_API_FAIL=1 "$CLI" handoff "$c" plan | grep -q '^agent: manual$'
 }
 cards_gate() {
   c="$(novo_caso)"; cp "$FX/BACKLOG.md" "$c/BACKLOG.md"; mkdir -p "$c/backlog/cards"

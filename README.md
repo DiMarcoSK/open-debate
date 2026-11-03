@@ -19,6 +19,7 @@ phase 6 decision: 5 ADRs, 4 specs; audit: 1 defect fixed
 phase 8 backlog: 42 items, 61 days, critical path B01 -> B07 -> B19 -> B33
 phase 8b completeness: 2 gaps (privacy policy, cost alerts), added as B40 and B44
 phase 8c cards: 44/44, BACKLOG-DETAILED.md
+start building now? yes -> build agent, from B01
 ```
 
 The numbers above illustrate the output format. Write the idea and answer the intake in any language: the agent talks back in yours, and every artifact is written in English.
@@ -86,6 +87,7 @@ open-debate init --project                 # current project instead of user lev
 | `BACKLOG.md`, `backlog.csv`, `backlog.json`, `backlog-gh.sh` | Backlog through launch, with dependencies, estimates and critical path |
 | `backlog/audit.md` | Completeness audit of the backlog, stage by stage from an empty repository to a launched, operated product; every gap becomes an item |
 | `BACKLOG-DETAILED.md` | 1 card per item: what to build, how in steps, files, interfaces, Given/When/Then and the test. Also in the CSV and the GitHub issues |
+| `HANDOFF.md` | Written when you choose to start building: the loop over the backlog, 1 item at a time with its test and commit |
 
 ## Why it works
 
@@ -106,6 +108,8 @@ open-debate init --project                 # current project instead of user lev
 ```
 
 The agent asks up to 6 intake questions and runs the phases. The case lives in `cases/<slug>/`. Running `/debate` again on an existing case resumes from the first phase that fails its gate.
+
+When the debate ends, the agent asks whether to start building. On yes it writes `HANDOFF.md`, the build loop over the backlog and its cards, and in opencode it switches the session to the `build` agent, which starts on the first item by itself. In other harnesses the same session starts building. See [hand-off](docs/harnesses.md#hand-off-to-building).
 
 ### From the command line
 
@@ -162,6 +166,7 @@ open-debate run "$case" --harness claude --mix claude,codex,gemini
 | `specs` | Create specs by hand, for use with `SPECS=0` |
 | `gate`, `validate` | Run the gates for one phase or the whole case |
 | `backlog`, `tile` | Export the backlog and the style tile |
+| `handoff` | Write `HANDOFF.md` with the next item; in an opencode session, switch to the `build` agent |
 
 `run` variables: `HARNESS`, `MODEL`, `MODEL_FALLBACK` (space-separated chain), `MIX`, `ROUTES`, `HARNESS_CMD`, `PANEL`, `FROM`, `RETRIES=2`, `TIMEOUT=600`, `BACKOFF=20`, `PARALLEL=6` (simultaneous calls, 0 for no limit), `MAX_CALLS=0` (hard limit per run, 0 for none), `MIN_LINES=5`, `RESEARCH=1`, `AGENDA=1`, `FACTCHECK=1`, `SPECS=1`, `REVIEW=1` (SDD and backlog audits), `CARDS=1`, `REPAIR=1`, `FRESH=0`.
 
@@ -182,6 +187,7 @@ flowchart TD
   I --> J[Backlog through launch]
   J --> K[Completeness audit from repo to operations]
   K --> L[Cards: what and how per item]
+  L --> M[Hand-off to the build agent]
 ```
 
 | Phase | Agent | Gate |

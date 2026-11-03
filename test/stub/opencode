@@ -11,6 +11,9 @@ if [ "${1:-}" = "models" ]; then
   exit 0
 fi
 
+# api: the session calls of handoff.sh. STUB_API_FAIL=1 simulates an opencode without the API.
+if [ "${1:-}" = "api" ]; then [ -z "${STUB_API_FAIL:-}" ] || exit 1; exit 0; fi
+
 [ "${1:-}" = "run" ] || { echo "stub: unsupported command: $*" >&2; exit 2; }
 agent=""; task=""
 while [ "$#" -gt 0 ]; do

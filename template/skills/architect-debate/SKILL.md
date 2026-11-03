@@ -82,6 +82,14 @@ Dissent that may reopen: <1 line>
 Open questions: <max 3, with a default>
 ```
 
+Phase 10, hand-off: right after the delivery, ask 1 question, with the harness's question tool when it has one: start building now? Options: `Start with <next item id and title>` (default) and `Not now`.
+- Not now: 1 line saying that `$S/handoff.sh <case>` (or `open-debate handoff <case>`) starts it later.
+- Start: run `$S/handoff.sh <case>`. It writes `<case>/HANDOFF.md`, the build loop over BACKLOG.md and its cards, and prints the next item and the agent state.
+  - `agent: switched build, kickoff queued` (opencode): end your turn with 1 line; the build agent starts on its own when this turn ends.
+  - `agent: switched build`: end with 1 line asking the user to send `go`; the build agent answers.
+  - `agent: manual` in opencode: tell the user to press Tab, pick `build` and send `follow <case>/HANDOFF.md`.
+  - Any other harness, where this session can write code: follow HANDOFF.md yourself, starting at the next item.
+
 ## CLI mode (`debate.sh`, any harness with a headless mode)
 
 Each specialist runs as an isolated process, with its persona in the prompt; nothing needs to be installed in the harness. In phases 2 and 3 the process runs in a room: a directory with only what it may read. Same protocol, same gates, up to the backlog. This is the path for harnesses without subagents (agy, pi, dsh, cline), CI, batch reruns and a table of mixed harnesses. opencode free models refuse headless calls (`Free usage limit reached`): use session mode with them.
