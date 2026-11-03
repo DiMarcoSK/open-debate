@@ -1,10 +1,13 @@
 #!/bin/sh
-# models.sh check|apply|repair|free|profile <free|mixed|strong> [model] - models of the debate agents in opencode.
+# models.sh check|apply|repair|free|profile <free|mixed|strong> [model]|next <case> <agent> [failed-model] - models of the debate agents in opencode.
 # Profile (models.conf): free = only zero-cost models (spends 0, shallower opinions); mixed = the `strong` model only on the
 # seats that decide (orchestrator, judge, auditor, architecture), the rest free; strong = `strong` everywhere (more tokens).
 # check: agent, model and state. apply: writes the profile into the agents. repair: swaps only what left the catalog.
 # Rotation: a free model that leaves the catalog becomes the spare and, without one, a distinct free model per agent
 # (round-robin), so the panel does not all land on one model and fight over one limit.
+# next: session-mode fallback. Records the model that ran out of quota (default: the agent's) in <case>/raw/exhausted-models
+# and prints the next one to pass in the subagent call: the `fallback` list, the spare, the strong model on a paid profile,
+# then every free model of the catalog, starting at a different one per agent. Exits 1 only when none is left.
 set -eu
 export LC_ALL=C
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
@@ -62,8 +65,31 @@ write() { # write <mode>: apply rewrites everything; repair only swaps a model t
   done
 }
 
+# next_model <case> <agent> [failed-model]
+next_model() {
+  f="$AGENTS/$2.md"; [ -f "$f" ] || { echo "error: unknown agent: $2" >&2; exit 2; }
+  failed="${3:-$(sed -n 's/^model: //p' "$f" | head -1)}"
+  x="$1/raw/exhausted-models"; mkdir -p "$1/raw"
+  now="$(date +%s)"
+  printf '%s %s\n' "$now" "$failed" >> "$x"
+  # Quotas reset: an entry older than 6 h no longer counts.
+  gone="$(awk -v t="$((now - 21600))" '$1 >= t { print $2 }' "$x")"
+  k="$(ls "$AGENTS"/debate*.md | grep -n "/$2\.md\$" | cut -d: -f1)"
+  list="$(conf fallback) $(conf spare)"
+  [ "$PROFILE" = "free" ] || list="$list $STRONG"
+  list="$list $(printf '%s\n' "$FREE" | awk -v k="${k:-0}" '{ l[NR] = $0 } END { for (j = 0; j < NR; j++) print l[(j + k) % NR + 1] }')"
+  for m in $list; do
+    if printf '%s\n' "$gone" | grep -qxF -- "$m"; then continue; fi
+    exists "$m" || continue
+    printf '%s\n' "$m"; return 0
+  done
+  echo "none left: every model is out of quota; wait for the limit to reset or add a paid one: open-debate models profile mixed <provider/model>" >&2
+  exit 1
+}
+
 case "${1:-check}" in
   free) printf '%s\n' "$FREE" ;;
+  next) next_model "${2:?usage: models.sh next <case> <agent> [failed-model]}" "${3:?usage: models.sh next <case> <agent> [failed-model]}" "${4:-}" ;;
   check)
     rc=0; printf 'profile %s%s\n' "$PROFILE" "${STRONG:+, strong=$STRONG}"
     for f in "$AGENTS"/debate*.md; do
@@ -85,5 +111,5 @@ case "${1:-check}" in
     grep -Ev '^(profile|strong)=' "$CONF" > "$CONF.tmp" || true
     { printf 'profile=%s\nstrong=%s\n' "$p" "$m"; cat "$CONF.tmp"; } > "$CONF"; rm -f "$CONF.tmp"
     PROFILE="$p"; STRONG="$m"; write apply ;;
-  *) echo "usage: models.sh check|apply|repair|free|profile <free|mixed|strong> [model]" >&2; exit 2 ;;
+  *) echo "usage: models.sh check|apply|repair|free|profile <free|mixed|strong> [model]|next <case> <agent> [failed-model]" >&2; exit 2 ;;
 esac

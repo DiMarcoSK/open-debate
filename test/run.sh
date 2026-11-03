@@ -104,6 +104,16 @@ perfil_misto() {
   "$CLI" models profile free
   grep -q '^model: opencode/free-' "$CFG/agents/debate-judge.md"
 }
+# Session mode: the next model skips the one that ran out of quota and says when none is left.
+proximo_modelo() {
+  c="$WORK/caso-next"; mkdir -p "$c"
+  m1="$("$CLI" models next "$c" debate-judge)"
+  [ -n "$m1" ]
+  [ "$m1" != "$(sed -n 's/^model: //p' "$CFG/agents/debate-judge.md")" ]
+  # The stub catalog has 2 free models: with both exhausted, none is left.
+  nao "$CLI" models next "$c" debate-judge "$m1" > "$WORK/n" 2>&1
+  grep -q 'none left' "$WORK/n"
+}
 protege_edicao() {
   echo extra >> "$CFG/agents/debate-pm.md"
   nao "$CLI" update > "$WORK/u" 2>&1
@@ -138,6 +148,7 @@ t "update keeps models.conf" preserva_conf
 t "update migrates a pre-0.5 modelos.conf" migra_conf
 t "update swaps only a model that left the catalog" update_repara_rotacao
 t "models profile mixed and free" perfil_misto
+t "models next falls back past exhausted models" proximo_modelo
 t "update refuses to overwrite an edit" protege_edicao
 t "update --force makes a backup" force_faz_backup
 
@@ -609,6 +620,29 @@ AUT
   [ "$(wc -l < "$WORK/aut.n" | tr -d ' ')" = "1" ]
   grep -q 'auth or quota' "$c/raw/summary.log"
 }
+# Quota on the primary model: the next one in MODEL_FALLBACK takes over, and the exhausted one is not called again in the run.
+fallback_cadeia() {
+  c="$(novo_caso)"
+  cat > "$WORK/fb" <<FB
+#!/bin/sh
+echo "\$MODEL" >> $WORK/fb.n
+if [ "\$MODEL" = "a" ]; then echo 'Error: FreeTierError: Free usage limit reached' >&2; exit 1; fi
+exec $ROOT/test/stub/harness pi "\$PROMPT"
+FB
+  : > "$WORK/fb.n"
+  HARNESS=custom HARNESS_CMD="exec sh $WORK/fb" MODEL=a SPECS=0 REVIEW=0 "$CLI" run "$c" --rounds 1 --fallback b
+  [ "$(grep -cx a "$WORK/fb.n")" = "1" ]
+  grep -qx b "$WORK/fb.n"
+  grep -q 'fallback in debate-research: trying custom:b' "$c/raw/summary.log"
+  [ -s "$c/decision.md" ]
+}
+# Every model out of quota: the run fails naming what it tried.
+fallback_esgota() {
+  c="$(novo_caso)"
+  printf '#!/bin/sh\necho "Error: quota exceeded, usage limit" >&2; exit 1\n' > "$WORK/fe"
+  nao env HARNESS=custom HARNESS_CMD="exec sh $WORK/fe" MODEL=a MODEL_FALLBACK="b custom:c" SPECS=0 "$CLI" run "$c" --rounds 1 > "$WORK/x" 2>&1
+  grep -q 'after trying custom:a custom:b custom:c' "$c/raw/summary.log"
+}
 paralelo_limita() {
   c="$(novo_caso)"; cp "$FX/research.md" "$c/research.md"
   cat > "$WORK/par" <<PAR
@@ -848,6 +882,8 @@ tp "panel with a designer and an art director" painel_de_marca
 tp "agents run in a room without rival output" sala_cega
 tp "429 limit waits and retries" limite_espera
 tp "auth failure does not retry" auth_nao_repete
+tp "quota falls back to the next model" fallback_cadeia
+tp "fails only when every model is exhausted" fallback_esgota
 tp "PARALLEL caps simultaneous calls" paralelo_limita
 tp "interrupt kills the calls in flight" interrompe_mata_filhos
 tp "mix spreads the panel across harnesses" mesa

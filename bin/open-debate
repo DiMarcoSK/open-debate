@@ -28,6 +28,7 @@ Install:
   open-debate doctor [--live] [options]     checks dependencies, install and, with --live, makes 1 real call
   open-debate harnesses                     lists supported harnesses and the state of each
   open-debate models [check|apply|free]     opencode models
+  open-debate models next <case> <agent>    the next model when the agent's runs out of quota (session fallback)
   open-debate models profile <p> [model]    cost profile: free | mixed (strong only on the deciders) | strong
   open-debate upgrade [--check]             downloads the newest stable version and updates the harnesses
 
@@ -44,13 +45,14 @@ Cases:
   open-debate backlog <case>                exports CSV, JSON and a gh script
   open-debate tile <case> [source.md]       generates style-tile.html and tokens
 
-  Run options: --harness x  --mix a,b,c  --panel design,brand,sec  --rounds 1-3  --from <phase>
+  Run options: --harness x  --mix a,b,c  --fallback model,harness:model  --panel design,brand,sec  --rounds 1-3  --from <phase>
 
 Panel: arch, ux and pm always sit. Without --panel, the optional seats come from the brief: design, brand, sec, ai, data,
 mobile, gcp, aws, k8s (references/panel.conf).
 
 Input (the idea and the brief answers) can be in any language; every artifact is written in English.
 --mix spreads the panel across different harnesses: each one argues with another model.
+--fallback lists the models tried, in order, when one runs out of quota; then come the --mix harnesses. The run fails only when none is left.
 --from archives that phase and the later ones in raw/archive and redoes them: research agenda proposal critique factcheck rebuttal decision sdd brand specs backlog.
 Run env: MODEL, MODEL_FALLBACK, HARNESS, HARNESS_CMD, ROUTES, MIX, PANEL, RETRIES, TIMEOUT, BACKOFF, PARALLEL, MAX_CALLS, RESEARCH, AGENDA, FACTCHECK, SPECS, REVIEW, REPAIR, FRESH.
 EOF
@@ -160,6 +162,7 @@ cmd_run() {
     case "$1" in
       --harness) HARNESS="$2"; shift 2 ;;
       --mix) MIX="$(csv "$2")"; shift 2 ;;
+      --fallback) MODEL_FALLBACK="$(csv "$2")"; export MODEL_FALLBACK; shift 2 ;;
       --rounds) rounds="$2"; shift 2 ;;
       --from) FROM="$2"; export FROM; shift 2 ;;
       --panel) PANEL=""; for a in $(csv "$2"); do PANEL="$PANEL debate-${a#debate-}"; done; PANEL="${PANEL# }"; shift 2 ;;

@@ -294,8 +294,8 @@ do_models() {
   m="$TARGET/$H_SKILLS/$SKILL/scripts/models.sh"
   case "${1:-check}" in
     check|free|apply|repair) exec "$m" "$1" ;;
-    profile) shift; exec "$m" profile "$@" ;;
-    *) echo "usage: open-debate models check|apply|repair|free|profile <free|mixed|strong> [provider/model]" >&2; exit 2 ;;
+    profile|next) a="$1"; shift; exec "$m" "$a" "$@" ;;
+    *) echo "usage: open-debate models check|apply|repair|free|profile <free|mixed|strong> [provider/model]|next <case> <agent> [failed-model]" >&2; exit 2 ;;
   esac
 }
 

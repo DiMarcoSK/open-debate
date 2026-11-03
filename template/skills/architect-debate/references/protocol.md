@@ -47,7 +47,7 @@ cases/<slug>/
 - panel of 3-8 agents: debate-arch, debate-ux and debate-pm always; optional seats from the brief (references/panel.conf, `panel.sh`); judge, researcher and auditor sit outside the panel
 - resume by default: an existing output is reused; `FRESH=1` redoes everything; `--from <phase>` archives that phase and the later ones in raw/archive and redoes them; `status` shows the next phase and warns when an output is older than its input
 - proposal and critique run in a room: a directory with only what the agent may read, no rival output
-- provider failed: session mode retries the Task 1x and continues with a panel >= 2; the CLI waits with backoff on a limit, uses `MODEL_FALLBACK` 1x on auth or quota
+- provider failed: automatic model fallback, the run fails only when no model is left. Session mode: `models.sh next <case> <agent>` gives the next model (models.conf `fallback`, spare, strong on a paid profile, the free catalog) for the subagent call; with none left, it continues with a panel >= 2. CLI: waits with backoff on a rate limit, then goes through `MODEL_FALLBACK` and the `MIX` harnesses; a route out of quota is skipped for the rest of the run
 - `PARALLEL` caps simultaneous calls, `MAX_CALLS` caps the run, 1 run per case (raw/.lock)
 - phase 7 in the CLI: 1 call per item of the decision.md index; `SPECS=0` leaves the specs for manual filling
 - language: input in any language, every artifact in English

@@ -122,7 +122,19 @@ open-debate status "$case"              # each phase, the next one, stale output
 open-debate run "$case" --from critique # archives that phase and the later ones in raw/archive, then redoes them
 ```
 
-`raw/metrics.tsv` records time, attempts and outcome per call, so you can see which phase is worth cutting. A rate limit waits with backoff; a login failure stops at once. `Ctrl-C` ends the calls in flight, and a second run on the same case is refused.
+`raw/metrics.tsv` records time, attempts and outcome per call, so you can see which phase is worth cutting. `Ctrl-C` ends the calls in flight, and a second run on the same case is refused.
+
+### When a model runs out
+
+A model that runs out of quota does not end the debate. The call moves to the next model in the chain, and the run fails only when none is left:
+
+```sh
+open-debate run "$case" --harness claude --fallback sonnet,codex:,gemini:
+```
+
+The chain is the agent's model, then `--fallback` (`MODEL_FALLBACK`) in order, where a bare model stays on the same harness and `harness:model` or `harness:` switches harness, then the `--mix` harnesses. A rate limit first waits with backoff; if it persists, the call moves on. A model out of quota is skipped for the rest of the run, so the next calls do not hit it again.
+
+In a session, the orchestrator does the same. In opencode it asks `open-debate models next <case> <agent>` for the next model and repeats the call with it: first the `fallback=` list in `models.conf`, then the spare, the strong model on a paid profile, and then every other free model in the catalog. A model out of quota stays out for 6 hours. Only with no model left does the agent leave the panel; with fewer than 2 left, the debate stops and resumes where it stopped.
 
 ### Mixed panel
 
@@ -141,13 +153,13 @@ open-debate run "$case" --harness claude --mix claude,codex,gemini
 | `init`, `update`, `uninstall` | Manage the installation; accept `--harness`, `--all`, `--project` and `--force` |
 | `doctor [--live]` | Checks dependencies and installation; `--live` makes 1 real call |
 | `harnesses` | Lists supported harnesses and the state of each |
-| `models check\|apply\|free\|profile` | Check, apply, list opencode models or set the cost profile |
+| `models check\|apply\|free\|profile\|next` | Check, apply, list opencode models, set the cost profile or get the fallback for an agent |
 | `new`, `run`, `status`, `panel` | Create, execute and inspect a case, and show the panel the brief triggers |
 | `specs` | Create specs by hand, for use with `SPECS=0` |
 | `gate`, `validate` | Run the gates for one phase or the whole case |
 | `backlog`, `tile` | Export the backlog and the style tile |
 
-`run` variables: `HARNESS`, `MODEL`, `MODEL_FALLBACK`, `MIX`, `ROUTES`, `HARNESS_CMD`, `PANEL`, `FROM`, `RETRIES=2`, `TIMEOUT=600`, `BACKOFF=20`, `PARALLEL=6` (simultaneous calls, 0 for no limit), `MAX_CALLS=0` (hard limit per run, 0 for none), `MIN_LINES=5`, `RESEARCH=1`, `AGENDA=1`, `FACTCHECK=1`, `SPECS=1`, `REVIEW=1` (audit), `REPAIR=1`, `FRESH=0`.
+`run` variables: `HARNESS`, `MODEL`, `MODEL_FALLBACK` (space-separated chain), `MIX`, `ROUTES`, `HARNESS_CMD`, `PANEL`, `FROM`, `RETRIES=2`, `TIMEOUT=600`, `BACKOFF=20`, `PARALLEL=6` (simultaneous calls, 0 for no limit), `MAX_CALLS=0` (hard limit per run, 0 for none), `MIN_LINES=5`, `RESEARCH=1`, `AGENDA=1`, `FACTCHECK=1`, `SPECS=1`, `REVIEW=1` (audit), `REPAIR=1`, `FRESH=0`.
 
 ## The protocol
 

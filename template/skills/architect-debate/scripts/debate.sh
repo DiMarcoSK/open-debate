@@ -4,7 +4,9 @@
 # Each specialist runs as an isolated process on the chosen harness. opencode free models refuse headless calls:
 # with them use /debate inside opencode (session mode, subagents).
 # Every artifact is written in English, whatever the language of the idea and the brief.
-# Env: HARNESS=opencode, MODEL (empty = harness default), MODEL_FALLBACK (1x on auth or limit), RETRIES=2, TIMEOUT=600, MIN_LINES=5,
+# Env: HARNESS=opencode, MODEL (empty = harness default), RETRIES=2, TIMEOUT=600, MIN_LINES=5,
+#      MODEL_FALLBACK="model harness:model harness:" (tried in order when a model runs out of quota or keeps hitting the
+#      rate limit; then the other MIX harnesses and HARNESS; the run fails only when none is left),
 #      BACKOFF=20 (s, doubles on every wait), PARALLEL=6 (simultaneous calls, 0 = no cap), MAX_CALLS=0 (run cap, 0 = no cap),
 #      FROM=<phase> (archives that phase and the later ones in raw/archive and redoes them),
 #      FRESH=0, AGENDA=1, REVIEW=1, RESEARCH=1, FACTCHECK=1, SPECS=1, REPAIR=1,
@@ -94,6 +96,7 @@ route() {
 
 h_exists "$HARNESS"
 for x in $ROUTES; do r="${x#*=}"; h_exists "${r%%:*}"; done
+for x in $MODEL_FALLBACK; do case "$x" in *:*) h_exists "${x%%:*}" ;; esac; done
 
 # macOS has no timeout(1); perl alarm kills a call stuck in an endless provider retry.
 TO="perl -e alarm(shift);exec(@ARGV)||die $TIMEOUT"
@@ -113,10 +116,12 @@ printf '%s\n' "$$" > "$LOCK/pid"
 PIDFILE="$OUT/raw/pids.$$"
 FAILS="$OUT/raw/fails.$$"
 CALLS="$OUT/raw/calls.$$"
+# Routes that ran out of quota in this run, 1 "harness|model" per line: the next calls skip them instead of failing again.
+EXHAUSTED="$OUT/raw/exhausted.$$"
 METRICS="$OUT/raw/metrics.tsv"
 SUMMARY="$OUT/raw/summary.log"
 START="$(date +%s)"
-: > "$PIDFILE"; : > "$FAILS"; : > "$CALLS"
+: > "$PIDFILE"; : > "$FAILS"; : > "$CALLS"; : > "$EXHAUSTED"
 
 # Kill the whole tree: without job control, a background call ignores SIGINT and would keep spending after Ctrl-C.
 kill_tree() {
@@ -131,7 +136,7 @@ interrupt() {
   exit 130
 }
 FG=""; MINIMUM=""
-cleanup() { rm -rf "$LOCK" "$OUT/raw/rooms"; rm -f "$PIDFILE" "$FAILS" "$CALLS"; }
+cleanup() { rm -rf "$LOCK" "$OUT/raw/rooms"; rm -f "$PIDFILE" "$FAILS" "$CALLS" "$EXHAUSTED"; }
 trap cleanup EXIT
 trap interrupt INT TERM
 
@@ -191,8 +196,7 @@ fi
 OUTPUT='OUTPUT: in this run you do not write files: do not use Write or Edit. Your whole final answer is the content of the requested file, with no comment before or after and no code fence around it. Write it in English, whatever the language of the brief.'
 
 run_once() {
-  agent="$1"; task="$2"; dest="$3"; raw="$4"; rot="$5"
-  h="${rot%% *}"; m="${rot#* }"
+  agent="$1"; task="$2"; dest="$3"; raw="$4"; h="$5"; m="$6"
   rc=0; h_run "$h" "$agent" "$task. $OUTPUT" "$m" "${ROOM:-$OUT}" "$raw.tmp" || rc=$?
   if [ "$rc" -eq 142 ]; then log "timed out in $agent after ${TIMEOUT}s: raise TIMEOUT and run again"; fi
   [ "$rc" -eq 0 ] || return 1
@@ -209,42 +213,66 @@ call_fits() {
   log "MAX_CALLS=$MAX_CALLS cap reached at $agent"; return 1
 }
 
+# candidates <agent>: "harness|model" per word, in the order they are tried: the agent's route, MODEL_FALLBACK
+# (a bare model stays on the route's harness), then the other harnesses of MIX and HARNESS with its MODEL. No repeats.
+candidates() {
+  r0="$(route "$1")"; h0="${r0%% *}"
+  {
+    printf '%s|%s\n' "$h0" "${r0#* }"
+    for x in $MODEL_FALLBACK; do
+      case "$x" in *:*) printf '%s|%s\n' "${x%%:*}" "${x#*:}" ;; *) printf '%s|%s\n' "$h0" "$x" ;; esac
+    done
+    for x in $MIX; do printf '%s|\n' "$x"; done
+    printf '%s|%s\n' "$HARNESS" "$MODEL"
+  } | awk '!seen[$0]++'
+}
+
+# try_agent: RETRIES attempts per candidate. Quota or login failure: the candidate is marked exhausted for the run
+# and the next one takes over at once. A rate limit waits with backoff and, if it persists, moves on too.
+# The call fails only when no candidate is left.
 try_agent() {
   agent="$1"; task="$2"; dest="$3"; raw="$4"
-  rot="$(route "$agent")"
-  tries=1
-  while [ "$tries" -le "$RETRIES" ]; do
-    call_fits || return 1
-    run_once "$agent" "$task" "$dest" "$raw" "$rot" && return 0
-    if h_auth_failed "$raw.tmp"; then
-      if [ -z "$MODEL_FALLBACK" ]; then
-        log "auth or quota error in $agent (${rot%% *}): check the login; in opencode, free models only run in session (/debate)"
-        break
-      fi
-      log "auth or quota error on the primary model, falling back 1x for $dest"
+  tries=0; used=""; tried=""
+  for c in $(candidates "$agent"); do
+    if grep -qxF -- "$c" "$EXHAUSTED"; then continue; fi
+    h="${c%%|*}"; m="${c#*|}"; used="$h${m:+:$m}"
+    [ -z "$tried" ] || log "fallback in $agent: trying $used"
+    tried="$tried $used"
+    n=1
+    while [ "$n" -le "$RETRIES" ]; do
+      tries=$((tries + 1))
       call_fits || return 1
-      run_once "$agent" "$task" "$dest" "$raw" "${rot%% *} $MODEL_FALLBACK" && return 0
-      break
-    fi
-    # Wait only on what waiting fixes; the jitter spreads calls of the same wave, which hit the limit together.
-    if [ "$tries" -lt "$RETRIES" ] && h_limit_failed "$raw.tmp"; then
-      e=$((BACKOFF * (1 << (tries - 1)) + ($(date +%s) + ${#dest}) % (BACKOFF / 4 + 1)))
-      log "rate limit in $agent (${rot%% *}), retrying in ${e}s"
-      sleep "$e"
-    fi
-    tries=$((tries + 1))
+      run_once "$agent" "$task" "$dest" "$raw" "$h" "$m" && return 0
+      if h_auth_failed "$raw.tmp"; then
+        printf '%s\n' "$c" >> "$EXHAUSTED"
+        log "auth or quota error in $agent on $used: skipped for the rest of the run"
+        continue 2
+      fi
+      if h_limit_failed "$raw.tmp"; then
+        if [ "$n" -ge "$RETRIES" ]; then log "rate limit in $agent on $used persists"; continue 2; fi
+        # Wait only on what waiting fixes; the jitter spreads calls of the same wave, which hit the limit together.
+        e=$((BACKOFF * (1 << (n - 1)) + ($(date +%s) + ${#dest}) % (BACKOFF / 4 + 1)))
+        log "rate limit in $agent ($h), retrying in ${e}s"
+        sleep "$e"
+      fi
+      n=$((n + 1))
+    done
   done
   rm -f "$dest.new"
-  log "FAILED $dest after $RETRIES attempt(s), see $raw.tmp.stderr"
+  case "$tried" in
+    '') log "FAILED $dest: every model is exhausted in this run; set MODEL_FALLBACK or MIX with another provider" ;;
+    *) log "FAILED $dest after trying${tried}, see $raw.tmp.stderr" ;;
+  esac
+  case " $tried " in *" opencode"*) log "hint: opencode free models only run in session (/debate), not headless" ;; esac
   return 1
 }
 
 # agent_call <agent> <task> <dest> <raw>: 1 line in raw/metrics.tsv per logical call.
 agent_call() {
-  t0="$(date +%s)"; rc2=0; tries=0
+  t0="$(date +%s)"; rc2=0; tries=0; used=""
   try_agent "$@" || rc2=$?
-  b4="${4##*/}"; r4="$(route "$1")"
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "${b4%.json}" "$1" "$(($(date +%s) - t0))" "$tries" "$rc2" "${r4%% *}" >> "$METRICS"
+  b4="${4##*/}"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "${b4%.json}" "$1" "$(($(date +%s) - t0))" "$tries" "$rc2" "${used%%:*}" >> "$METRICS"
   return "$rc2"
 }
 
