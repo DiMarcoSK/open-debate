@@ -3,7 +3,7 @@ description: Orchestrator of /debate. Runs the intake, delegates each phase to s
 mode: primary
 model: opencode/beam-free
 temperature: 0.2
-steps: 80
+steps: 120
 permission:
   read: allow
   glob: allow

@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.6.0
+
+### Added
+
+- Model fallback. A model out of quota or usage limit no longer ends the debate. `open-debate run` tries `--fallback` (`MODEL_FALLBACK`, now a list of `model`, `harness:model` or `harness:`) in order, then the `--mix` harnesses, and skips an exhausted route for the rest of the run. A persistent rate limit also moves on. It fails only when no model is left.
+- Session fallback: `open-debate models next <case> <agent>` gives the orchestrator the next model for the subagent call: the new `fallback=` list in `models.conf`, the spare, the strong model on a paid profile, then the free catalog. A model out of quota stays out for 6 hours.
+- Completeness audit of the backlog (phase 8b). debate-auditor checks it against `references/completeness.md`, 13 stages from an empty repository to a launched, operated product. The gate checks every stage and that the cited items exist, and each gap goes back to debate-pm as new items.
+- Cards (phase 8c): 1 per item before Post-launch, with what to build, how in steps, files, interfaces, Given/When/Then and the test, merged into `BACKLOG-DETAILED.md` and added to `backlog.csv`, `backlog.json` and the GitHub issue body. `CARDS=0` and `--no-cards` skip them; `--from cards` redoes them.
+- Hand-off (phase 10). When the debate ends, the orchestrator asks whether to start building. `handoff.sh` (`open-debate handoff <case>`) writes `HANDOFF.md`. In an opencode 2.x session, it switches to the `build` agent and queues the kickoff.
+- Tokens per call in `raw/metrics.tsv` (opencode, Claude Code, Cursor, Droid, Gemini, Antigravity), and the share per phase in `status`.
+- [docs/efficiency.md](docs/efficiency.md): where time and tokens go, what is applied, settings for a cheaper run and ideas left out.
+
+### Changed
+
+- Calls read each file once. The SDD, audit and fix calls read `decision.md` without `adr/`; a spec gets its scope line in the prompt and reads `adr/` instead of `decision.md`; the backlog reads `adr/` only.
+- `REVIEW=1` now covers both audits, the SDD and the backlog. `--no-audit` skips both in a session.
+- A backlog item may cite `brief` as its source.
+
 ## 0.5.0
 
 ### Changed (breaking)
