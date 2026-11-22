@@ -76,7 +76,7 @@ init_global() {
   grep -q '"~/.config/opencode/skills/architect-debate/scripts/\*": allow' "$CFG/agents/debate.md"
   grep -q "\"$SK/scripts/\*\": allow" "$CFG/agents/debate.md"
 }
-modelos_aplicados() { grep -q '^model: opencode/free-a$' "$CFG/agents/debate-judge.md"; }
+modelos_aplicados() { grep -Eq '^model: opencode/free-[ab]$' "$CFG/agents/debate-judge.md"; }
 idempotente() { "$CLI" init | grep -q '0 new, 0 updated, 0 overwritten'; }
 doctor_ok() { "$CLI" doctor; }
 t "init installs and renders paths" init_global
@@ -513,6 +513,17 @@ e2e() {
   grep -q '^cards *ok 16 card' "$WORK/s"
   "$CLI" validate "$c"
 }
+# Every gate passes but validate does not: the run ends in ABORT with the reason, never in "ok".
+fim_valida() {
+  c="$(novo_caso)"
+  SPECS=0 MODEL=stub/modelo "$CLI" run "$c" 1 > /dev/null
+  "$CLI" specs "$c" ingestion triage report > /dev/null
+  for d in "$c"/specs/*/; do cp "$FX/spec.md" "$FX/plan.md" "$FX/tasks.md" "$d"; done
+  echo 'Deadline holds [assumed].' >> "$c/idea.md"
+  nao env SPECS=0 MODEL=stub/modelo "$CLI" run "$c" 1 > "$WORK/x" 2>&1
+  grep -q 'validate: assumed-without-owner: .*idea.md' "$c/raw/summary.log"
+  grep -q 'ABORT: validate failed' "$c/raw/summary.log"
+}
 # A gap found by the completeness audit becomes a backlog item once; a rerun does not fix it again.
 lacuna_vira_item() {
   c="$(novo_caso)"
@@ -786,6 +797,227 @@ painel_de_marca() {
   )
 }
 tp "full protocol up to the backlog" e2e
+# --- after the debate: verdict, teach-back, receipt, build context per item, appeal
+SCR="$ROOT/template/skills/architect-debate/scripts"
+# caso_construido: a case with ADRs, backlog, cards, specs and SDD from the fixtures, no run needed.
+caso_construido() {
+  c="$(novo_caso)"
+  cp "$FX/BACKLOG.md" "$FX/decision.md" "$FX/SDD.md" "$c/"; cp "$FX/cards.md" "$c/BACKLOG-DETAILED.md"
+  for s in 01-ingestion 02-triage 03-report; do mkdir -p "$c/specs/$s"; cp "$FX/spec.md" "$FX/plan.md" "$FX/tasks.md" "$c/specs/$s/"; done
+  ( TOK="$SCR/tokens.awk"; PANEL=""; . "$SCR/gates.sh"; split_adrs "$c" > /dev/null )
+  printf '%s' "$c"
+}
+veredito() {
+  c="$(caso_construido)"
+  "$CLI" verdict "$c" > /dev/null
+  grep -q '^| ADR-0001 Use a modular monolith | Modular monolith | Microservices; Serverless functions | a slow module slows the whole app until it is split | debate-k8s: portability; reopens if the app passes 10 services |$' "$c/VERDICT.md"
+  grep -q '^Backlog: 17 items, 30.0 days of work, 0 done.$' "$c/VERDICT.md"
+  "$CLI" verdict "$c" receipt > /dev/null
+  grep -q '^- Modular monolith instead of Microservices or Serverless functions, because it scores 430 against 300 and 1 deploy fits a team of 2. What it costs: a slow module slows the whole app until it is split.$' "$c/RECEIPT.md"
+  grep -q '^- Later, after launch: Export to BI$' "$c/RECEIPT.md"
+  nao grep -q 'debate-k8s' "$c/RECEIPT.md"
+}
+# The quiz never shows the answer, always asks the same for the same case, and grading names only the ADRs missed.
+teach_back() {
+  c="$(caso_construido)"
+  "$CLI" verdict "$c" quiz > "$WORK/q"
+  "$CLI" verdict "$c" quiz | cmp -s - "$WORK/q"
+  grep -q '^Q1 (ADR-0001) 2 developers must ship triage in 8 weeks at 300 alerts per day. Which option did the panel choose?$' "$WORK/q"
+  nao grep -q 'Use a modular monolith' "$WORK/q"
+  [ "$(grep -c '^  [a-c]) ' "$WORK/q")" -eq 7 ]
+  ok="$(awk -F'\t' '{ printf "%s=%s ", $1, $2 }' "$c/raw/quiz.key")"
+  "$CLI" verdict "$c" check $ok | grep -q '^teach-back: 3/3$'
+  k1="$(awk -F'\t' '$1 == 1 { print $2 }' "$c/raw/quiz.key")"; w1=a; [ "$k1" != a ] || w1=b
+  nao "$CLI" verdict "$c" check "1=$w1" "$(awk -F'\t' '$1 == 2 { print "2=" $2 }' "$c/raw/quiz.key")" > "$WORK/r"
+  grep -q '^teach-back: 1/3$' "$WORK/r"
+  grep -q '^review ADR-0001 Use a modular monolith: chosen "Modular monolith"$' "$WORK/r"
+  grep -q '^review ADR-0003 .*, not answered$' "$WORK/r"
+}
+# 1 file per item with only what it traces to: its card, the ADR it follows, its spec task and the EARS lines of that story.
+contexto_item() {
+  c="$(caso_construido)"
+  "$CLI" item "$c" > "$WORK/i"
+  [ "$(ls "$c"/build/B*.md | wc -l | tr -d ' ')" -eq 16 ]
+  ausente "$c/build/B17.md"
+  grep -q '^- ADR-0001 Use a modular monolith: "Modular monolith", because .* Accepted cost: a slow module .* Check: Test in CI.$' "$c/build/B01.md"
+  nao grep -q 'ADR-0002' "$c/build/B01.md"
+  grep -q '^Depends on: B02 (open) B03 (open)$' "$c/build/B04.md"
+  grep -q '^- \[ \] T001 \[US1\] action$' "$c/build/B04.md"
+  grep -q 'THE SYSTEM SHALL queue it within 2 s' "$c/build/B04.md"
+  grep -q '^- Test: e2e b04 asserts' "$c/build/B04.md"
+  [ "$(wc -l < "$c/build/B04.md" | tr -d ' ')" -le 45 ]
+  nao "$CLI" item "$c" B99 2> /dev/null
+  "$CLI" handoff "$c" > /dev/null
+  grep -q '^2\. Read build/<Bnn>.md' "$c/HANDOFF.md"
+  grep -q "^    $SCR/appeal.sh $c <Bnn> <file>$" "$c/HANDOFF.md"
+  grep -q '^- VERDICT.md: ' "$c/HANDOFF.md"
+}
+# The build reopens 1 ADR with literal evidence; supersede writes the new ADR, the build follows it, the next case learns.
+recurso() {
+  c="$(caso_construido)"
+  printf 'FAIL test/b01.test.ts\n  deploy took 14 min, budget 5 min\n' > "$WORK/log"
+  nao "$CLI" appeal "$c" B04 "$WORK/log" 2> "$WORK/e"
+  grep -q 'B04 cites no ADR' "$WORK/e"
+  "$CLI" appeal "$c" B01 "$WORK/log" > "$WORK/a"
+  A="$c/appeals/01-adr-0001"
+  grep -q '^appeal: appeals/01-adr-0001$' "$WORK/a"
+  grep -q '^Next free ADR number: ADR-0004$' "$A/appeal.md"
+  nao "$CLI" appeal "$c" ADR-0002 "$WORK/log" 2> /dev/null
+  for a in debate-arch debate-pm; do printf 'Position: supersede\nEvidence: "deploy took 14 min"\nReason: 14 min against 5.\nChange: split the deploy.\n' > "$A/$a.md"; done
+  "$CLI" gate "$c" appeal > /dev/null
+  sed -i.b 's/deploy took 14 min/deploy took 9 min/' "$A/debate-pm.md"
+  nao "$CLI" gate "$c" appeal > "$WORK/g"
+  grep -q 'debate-pm.md: Evidence quote not found literally in evidence.txt' "$WORK/g"
+  { printf 'Ruling: supersede\nEvidence: "deploy took 14 min, budget 5 min"\nReason: 14 against 5.\nLesson: one deploy unit breaks the 5 min budget past 3 modules\n\n'
+    sed -n '/^## ADR-0001/,/^## ADR-0002/p' "$FX/decision.md" | sed '$d' | sed 's/^## ADR-0001 Use a modular monolith/## ADR-0004 Deploy each module on its own/'; } > "$A/ruling.md"
+  "$CLI" gate "$c" ruling > /dev/null
+  "$CLI" appeal "$c" apply > "$WORK/p"
+  grep -q '^ruling: supersede ADR-0001, now ADR-0004$' "$WORK/p"
+  existe "$c/adr/0004-deploy-each-module-on-its-own.md"
+  grep -q '^- Status: superseded by ADR-0004$' "$c/adr/0001-use-a-modular-monolith.md"
+  grep -q '^- ADR-0001: superseded by ADR-0004, below$' "$c/build/B01.md"
+  "$CLI" verdict "$c" > /dev/null
+  nao grep -q '^| ADR-0001 ' "$c/VERDICT.md"
+  grep -q '^| ADR-0004 Deploy each module on its own ' "$c/VERDICT.md"
+  grep -q 'triagem-de-alertas ADR-0001: supersede (ADR-0004) after B01. one deploy unit breaks' "$WORK/cases/lessons.md"
+  nao "$CLI" gate "$c" ruling > /dev/null
+  # The next case in this folder starts with the lesson, and its panel reads it.
+  n="$("$CLI" new "Outra ideia" "$WORK/cases")"
+  existe "$n/lessons.md"
+  sed -i.b 's/^\(- [^:]*:\)[[:space:]]*$/\1 preenchido/' "$n/brief.md"
+  STUB_LOG="$WORK/sl" SPECS=0 MODEL=stub/modelo "$CLI" run "$n" 1 > /dev/null
+  grep 'phase proposal' "$WORK/sl" | grep -q '<file path="lessons.md">'
+}
+recurso_mantem() {
+  c="$(caso_construido)"
+  printf 'FAIL flaky network in CI, passed on retry\n' > "$WORK/log"
+  "$CLI" appeal "$c" ADR-0002 "$WORK/log" > /dev/null
+  A="$c/appeals/01-adr-0002"
+  printf 'Ruling: keep\nEvidence: "flaky network in CI"\nReason: 1 flaky run, not the decision.\nLesson: none\n' > "$A/ruling.md"
+  cp "$c/adr/0002-use-cloud-run.md" "$WORK/before"
+  "$CLI" appeal "$c" apply | grep -q '^ruling: keep ADR-0002$'
+  cmp -s "$WORK/before" "$c/adr/0002-use-cloud-run.md"
+  ausente "$WORK/cases/lessons.md"
+  "$CLI" appeal "$c" ADR-0003 "$WORK/log" | grep -q '^appeal: appeals/02-adr-0003$'
+}
+tp "verdict: decisions in 1 screen and a client receipt" veredito
+tp "verdict: teach-back quiz grades and names what to review" teach_back
+tp "item: build context per item, wired into the hand-off" contexto_item
+tp "appeal: literal evidence, supersede, lessons for the next case" recurso
+tp "appeal: keep changes no ADR and records no lesson" recurso_mantem
+
+# --- brainstorm
+BS="$ROOT/template/skills/architect-debate/scripts/brainstorm.sh"
+GT="$ROOT/template/skills/architect-debate/scripts/gate.sh"
+# novo_bs: a brainstorm folder with the analogy and outcome lenses, the ids of the fixtures.
+novo_bs() { LENSES="analogy outcome" PRODUCT=none "$BS" new "Vamos ser criativos, pense em features novas" "$WORK/cases" | head -1; }
+# The draw comes from the seed, not from the model: the same seed repeats it, analogy always sits.
+bs_sorteio() {
+  a="$(SEED=7 PRODUCT=none "$BS" new "tema" "$WORK/c" | sed 1d)"
+  b="$(SEED=7 PRODUCT=none "$BS" new "tema" "$WORK/c" | sed 1d)"
+  [ "$a" = "$b" ]
+  [ "$(printf '%s\n' "$a" | wc -l | tr -d ' ')" -eq 4 ]
+  printf '%s\n' "$a" | head -1 | grep -q '^lens: analogy | '
+  [ "$(printf '%s\n' "$a" | cut -d'|' -f1 | sort -u | wc -l | tr -d ' ')" -eq 4 ]
+  d=0; for s in 1 2 3 4 5 6; do x="$(SEED=$s NLENSES=3 PRODUCT=none "$BS" new "tema" "$WORK/c" | sed 1d)"; [ "$x" = "$a" ] || d=$((d + 1)); done
+  [ "$d" -ge 5 ]
+  existe "$WORK/c/brainstorms/tema/theme.md" "$WORK/c/brainstorms/tema-2/meta.txt" "$WORK/c/brainstorms/tema/ground-template.md"
+  nao env LENSES="analogy nope" "$BS" new "tema" "$WORK/c" 2> "$WORK/e"
+  grep -q 'unknown lens nope' "$WORK/e"
+  "$BS" lenses "$WORK/c/brainstorms/tema" | grep -q '^analogy | writes ideas/analogy.md | phase ideate: lens Far analogy (analogy), ids AN1-AN3\. .*Stimulus: '
+}
+# Headless: ground, 1 blind call per lens, novelty and converge, every gate approved.
+bs_ponta() {
+  b="$(novo_bs)"
+  PATH="$FAKE:$PATH" STUB_LOG="$WORK/log" HARNESS=claude "$BS" run "$b" > "$WORK/x"
+  for p in ground ideas novelty converge; do "$GT" "$b" "$p" > /dev/null; done
+  grep -q '^brainstorm ok: P1' "$b/raw/summary.log"
+  grep -q '^cost: 5 calls, [0-9]* s of model time, 4500 tokens in and 500 out on 5 of them$' "$b/raw/summary.log"
+  grep -q '^### OU1 ' "$b/ideas/outcome.md"
+  # Blind: an ideator gets theme.md and ground.md, never another lens's ideas.
+  grep 'phase ideate: lens Far analogy' "$WORK/log" > "$WORK/an"
+  grep -q '<file path="ground.md">' "$WORK/an"
+  nao grep -q '<file path="ideas/' "$WORK/an"
+  grep 'phase converge' "$WORK/log" | grep -q '<file path="ideas/outcome.md">'
+  # Running again reuses what passed.
+  PATH="$FAKE:$PATH" HARNESS=claude "$BS" run "$b" > "$WORK/y"
+  grep -q 'reuse ideas/analogy.md' "$WORK/y"
+}
+bs_reparo() {
+  b="$(novo_bs)"
+  PATH="$FAKE:$PATH" FAIL_ONCE=ideas.md HARNESS=claude "$BS" run "$b" > "$WORK/x"
+  grep -q 'gate ideas failed on ideas/' "$b/raw/summary.log"
+  grep -q 'after repair' "$b/raw/summary.log"
+}
+# Gates: invented ids, missing fields, an idea without a novelty row, a proposal that exists but scores as novel.
+bs_gates() {
+  b="$(novo_bs)"
+  cp "$FX/ground.md" "$b/ground.md"; cp "$FX/novelty.md" "$b/novelty.md"; cp "$FX/converge.md" "$b/brainstorm.md"
+  for l in AN OU; do sed "s/XX/$l/g" "$FX/ideas.md" > "$b/ideas/$([ $l = AN ] && echo analogy || echo outcome).md"; done
+  for p in ground ideas novelty converge; do "$GT" "$b" "$p" > /dev/null; done
+  sed -i.b 's/^- Anchor: G3.*/- Anchor: G99 - invented/; /^- First test: 3 loans/d' "$b/ideas/analogy.md"
+  nao "$GT" "$b" ideas > "$WORK/i"
+  grep -q 'cites an id missing from ground.md: G99' "$WORK/i"
+  grep -q 'AN2:first test' "$WORK/i"
+  sed -i.b '/^| OU2 /d' "$b/novelty.md"
+  nao "$GT" "$b" novelty > "$WORK/n"
+  grep -q 'ideas without a row: OU2' "$WORK/n"
+  sed -i.b 's/^| P3 | 1 | 4 | 3 | 5 | 305 |/| P3 | 4 | 4 | 3 | 5 | 395 |/; s/^Wildcard:.*//' "$b/brainstorm.md"
+  nao "$GT" "$b" converge > "$WORK/c"
+  grep -q 'P3 scores novelty 4 but every idea it comes from exists' "$WORK/c"
+  grep -q 'no Wildcard: line' "$WORK/c"
+  cp "$FX/converge.md" "$b/brainstorm.md"
+  sed -i.b 's/^Pick: P1,/Pick: P2,/; s/^Wildcard: P2,/Wildcard: P3,/; s/^| P3 | 1 | 4 | 3 | 5 | 305 |/| P3 | 1 | 4 | 3 | 2 | 245 |/' "$b/brainstorm.md"
+  nao "$GT" "$b" converge > "$WORK/c"
+  grep -q 'Pick: P2 totals 360, below P1 (370)' "$WORK/c"
+  grep -q 'Wildcard: P3 scores feasibility 2' "$WORK/c"
+  sed -i.b 's/^Pick: P2, because/Pick: P2, override: the first test is cheaper, because/; s/^Wildcard: P3,/Wildcard: same as the pick, P3/' "$b/brainstorm.md"
+  "$GT" "$b" converge > /dev/null
+  # Each lens starts from its own pain of ground.md: an ideas file that ignores it fails.
+  "$BS" lenses "$b" | grep -q '^analogy | .* Pain: start from G[34], the pain this lens owns'
+  p_="$(cd "$ROOT/template/skills/architect-debate/scripts" && TOK=tokens.awk PANEL="" sh -c '. ./gates.sh; pain_of "$1" analogy' _ "$b")"
+  sed "s/XX/AN/g; s/^- Anchor: $p_ /- Anchor: G1 /" "$FX/ideas.md" > "$b/ideas/analogy.md"
+  nao "$GT" "$b" ideas > "$WORK/p"
+  grep -q "ideas/analogy.md: no idea anchors on $p_, the pain this lens starts from" "$WORK/p"
+  sed -i.b '/^| B[4-6] /d' "$b/ground.md"
+  nao "$GT" "$b" ground > "$WORK/g"
+  grep -q '3 baseline idea(s), expected 6-12' "$WORK/g"
+}
+# The pick becomes a debate case: its idea.md carries the proposal and the brainstorm records the pick.
+bs_semente() {
+  b="$(novo_bs)"
+  PATH="$FAKE:$PATH" HARNESS=claude "$BS" run "$b" > /dev/null
+  c="$("$BS" seed "$b" P2)"
+  existe "$c/brief.md" "$c/brainstorm.md" "$c/ground.md"
+  grep -q '^Idea loan: Borrow an idea for 1 week$' "$c/idea.md"
+  grep -q 'P2 (ideas AN2)' "$c/idea.md"
+  grep -q '^- Goal (1 sentence): Idea loan: Borrow an idea for 1 week$' "$c/brief.md"
+  grep -q '^- Who uses it: stuck teams$' "$c/brief.md"
+  grep -q '^- 90-day success metric (number): first test: go if 2 return$' "$c/brief.md"
+  grep -q '^- Deadline and team:$' "$c/brief.md"
+  grep -q '^P2, by user; case: ' "$b/brainstorm.md"
+  nao grep -q '^pending' "$b/brainstorm.md"
+  [ "$(dirname "$c")" = "$WORK/cases" ]
+  nao "$BS" seed "$b" P9 2> "$WORK/e"
+  grep -q 'P9 is not a proposal' "$WORK/e"
+}
+# The CLI takes the options and runs the same script.
+bs_cli() {
+  "$CLI" brainstorm new "tema livre" "$WORK/cases" --lenses analogy,outcome --seed 3 --no-product > "$WORK/n"
+  b="$(head -1 "$WORK/n")"
+  grep -q '^product: none$' "$b/meta.txt"
+  [ "$(sed -n 's/^lens: \([a-z]*\) .*/\1/p' "$b/meta.txt" | tr '\n' ' ')" = "analogy outcome " ]
+  PATH="$FAKE:$PATH" "$CLI" brainstorm run "$b" --harness claude > /dev/null
+  "$CLI" brainstorm seed "$b" P1 | grep -q 'curated-wing'
+  nao "$CLI" brainstorm run 2> /dev/null
+}
+tp "brainstorm: the draw comes from the seed" bs_sorteio
+tp "brainstorm: the CLI passes the options" bs_cli
+tp "brainstorm: headless run with blind ideators" bs_ponta
+tp "brainstorm: a failed idea gate gets 1 repair" bs_reparo
+tp "brainstorm: gates catch invented ids and false novelty" bs_gates
+tp "brainstorm: the pick seeds a debate case" bs_semente
+tp "a run that fails validate does not end in ok" fim_valida
 tp "completeness gap becomes a backlog item once" lacuna_vira_item
 tp "rebuttal only for vetoed agents" replica_so_de_vetado
 tp "audit with a defect fixes once" auditoria_corrige
@@ -832,6 +1064,30 @@ instala_todos() {
     grep -q 'HARNESS=dsh' "$HOME/.dsh/skills/debate/SKILL.md"
     grep -q '{{args}}' "$HOME/.gemini/commands/debate.toml"
     jq -Rs 'length' "$HOME/.codex/agents/debate-arch.toml" > /dev/null
+  )
+}
+# Every command of entry/commands.conf is installed in every harness, in its own format, with nothing left to render.
+comandos_instalados() {
+  (
+    export PATH="$FAKE:$PATH"
+    "$CLI" init --all > "$WORK/i"
+    n=0
+    for c in $(sed -n 's/^\([a-z][a-z0-9-]*\)|.*/\1/p' "$ROOT/template/entry/commands.conf"); do
+      n=$((n + 1))
+      existe "$HOME/.config/opencode/commands/$c.md" "$HOME/.claude/skills/$c/SKILL.md" "$HOME/.agents/skills/$c/SKILL.md" \
+        "$HOME/.gemini/commands/$c.toml" "$HOME/.qwen/commands/$c.toml" "$HOME/.pi/agent/skills/$c/SKILL.md" "$HOME/.cline/skills/$c/SKILL.md"
+      grep -q "^name: $c\$" "$HOME/.claude/skills/$c/SKILL.md"
+      grep -q "/$c/SKILL.md and follow it" "$HOME/.gemini/commands/$c.toml"
+      grep -q "ready in Claude Code: .*/$c" "$WORK/i"
+      grep -q "ready in Codex CLI: .*\\\$$c" "$WORK/i"
+    done
+    [ "$n" -ge 2 ]
+    nao grep -rln '{{[A-Z_]*}}' "$HOME/.claude/skills" "$HOME/.config/opencode/commands" "$HOME/.gemini/commands"
+    # Orchestrators (mode: primary) are opencode agents only; elsewhere the main session orchestrates.
+    existe "$HOME/.config/opencode/agents/debate.md" "$HOME/.claude/agents/debate-specialist.md"
+    ausente "$HOME/.claude/agents/debate.md"
+    grep -q 'references/brainstorm.md' "$HOME/.claude/skills/opd-brainstorm/SKILL.md"
+    grep -q 'allowed-tools: Bash' "$HOME/.claude/skills/opd-brainstorm/SKILL.md"
   )
 }
 toml_valido() {
@@ -881,6 +1137,7 @@ nada_detectado() {
   grep -q 'no harness detected' "$WORK/x"
 }
 t "init --all installs in the 13 harnesses" instala_todos
+t "every command is installed in every harness" comandos_instalados
 t "Codex agent is valid TOML" toml_valido
 t "update keeps a model on a commented line" update_preserva_modelo_comentado
 t "uninstall --all cleans everything" desinstala_todos

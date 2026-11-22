@@ -47,8 +47,8 @@ Phases 1-6, each row is 1 wave of Tasks. `reads` and `writes` go in the Task pro
 |---|---|---|---|---|
 | 1 research | debate-research (opens debate-scout per question) | brief.md, research-template.md | research.md | `gate.sh <case> research` |
 | 1b agenda | debate-judge, `phase agenda`, with the panel and the seats it may add in the prompt | brief.md, constitution.md, research.md, agenda-template.md | agenda.md | `gate.sh <case> agenda` (seats what the agenda adds and prints the panel); then grill 2: the agenda decisions that depend on user preference (not on evidence) become up to 3 questions with a default; the answer goes into brief.md before the proposals |
-| 2 proposal | whole panel | brief.md, constitution.md, research.md, agenda.md, debate-rules.md, visual-contract.md (design, ux, brand) | proposals/<agent>.md | `gate.sh <case> proposal` |
-| 3 critique | whole panel | brief.md, research.md, agenda.md, debate-rules.md, rival proposals | critiques/<agent>.md | `gate.sh <case> critique` |
+| 2 proposal | whole panel | brief.md, constitution.md, research.md, agenda.md, debate-rules.md, lessons.md (if the case has it), visual-contract.md (design, ux, brand) | proposals/<agent>.md | `gate.sh <case> proposal` |
+| 3 critique | whole panel | brief.md, research.md, agenda.md, debate-rules.md, lessons.md (if the case has it), rival proposals | critiques/<agent>.md | `gate.sh <case> critique` |
 | 4 fact-check | debate-research, `phase fact-check` | proposals/, critiques/, research-template.md | research-check.md | does not block |
 | 5 rebuttal | only the agents listed by `gate.sh <case> vetoed` | brief.md, research.md, research-check.md, own proposal, vetoes against it, rivals | proposals/<agent>-r2.md | does not block |
 | 6a decision | debate-judge, `phase decision` | everything above, adr-template.md | decision.md | `gate.sh <case> decision` (splits adr/) |
@@ -83,13 +83,17 @@ Dissent that may reopen: <1 line>
 Open questions: <max 3, with a default>
 ```
 
+Phase 9b, read the decisions without reading the case: run `$S/verdict.sh <case>`, which writes VERDICT.md (1 row per ADR: chosen, over what, its cost, the objection still standing), and show it. Then offer the teach-back, 1 question with the question tool: `Quiz me on the decisions` (default) or `Skip`. On quiz: `$S/verdict.sh <case> quiz` prints 1 question per ADR with its options; ask them, all in 1 round if the tool takes several, never showing the key (raw/quiz.key); then `$S/verdict.sh <case> check 1=<letter> 2=<letter> ...` grades and names the ADRs to open: show only those. For a client or anyone outside the team, `$S/verdict.sh <case> receipt` writes RECEIPT.md: what was chosen and why, its cost, what is not included and the delivery plan, in plain words.
+
 Phase 10, hand-off: right after the delivery, ask 1 question, with the harness's question tool when it has one: start building now? Options: `Start with <next item id and title>` (default) and `Not now`.
 - Not now: 1 line saying that `$S/handoff.sh <case>` (or `open-debate handoff <case>`) starts it later.
-- Start: run `$S/handoff.sh <case>`. It writes `<case>/HANDOFF.md`, the build loop over BACKLOG.md and its cards, and prints the next item and the agent state.
+- Start: run `$S/handoff.sh <case>`. It writes `<case>/HANDOFF.md`, the build loop over BACKLOG.md and its cards, `build/<Bnn>.md` per item (`item.sh`: its card and only the ADR decisions, spec tasks and requirements it traces to, so the build reads 1 short file per item) and VERDICT.md, and prints the next item and the agent state.
   - `agent: switched build, kickoff queued` (opencode): end your turn with 1 line; the build agent starts on its own when this turn ends.
   - `agent: switched build`: end with 1 line asking the user to send `go`; the build agent answers.
   - `agent: manual` in opencode: tell the user to press Tab, pick `build` and send `follow <case>/HANDOFF.md`.
   - Any other harness, where this session can write code: follow HANDOFF.md yourself, starting at the next item.
+
+Appeal, during the build: when an item's test fails twice for the same reason, or the code can only pass by going against an ADR, HANDOFF.md runs `$S/appeal.sh <case> <Bnn|ADR-NNNN> <evidence-file>`. It opens `appeals/<nn>-adr-<NNNN>/` and prints 3 steps: debate-arch and debate-pm `phase appeal` in parallel (positions in the debate-rules.md Appeal format, gate `gate.sh <case> appeal`: the evidence excerpt must be literal in evidence.txt), debate-judge `phase ruling` (gate `gate.sh <case> ruling`), then `$S/appeal.sh <case> apply`: keep, amend the ADR in adr/ or supersede it with a new one, rebuild build/ and append the lesson to `lessons.md` next to the case. Every new case in that folder copies lessons.md, and the panel reads it in phases 2 and 3. After an appeal, adr/ is the record: rerunning the decision phase would split decision.md over it.
 
 ## CLI mode (`debate.sh`, any harness with a headless mode)
 

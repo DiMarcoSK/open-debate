@@ -51,6 +51,10 @@ case "$tarefa" in
   "phase cards"*) f=cards.md ;;
   "phase backlog-design"*|"phase backlog-eng"*) f=track.md ;;
   "phase backlog"*) f=BACKLOG.md ;;
+  "phase ground"*) f=ground.md ;;
+  "phase ideate"*) f=ideas.md ;;
+  "phase novelty"*) f=novelty.md ;;
+  "phase converge"*) f="${STUB_CONVERGE:-converge.md}" ;;
   *"READY"*) f="" ;;
   *) echo "stub: unknown task: $tarefa" >&2; exit 2 ;;
 esac
@@ -59,6 +63,8 @@ elif [ "${FAIL_ONCE:-}" = "$f" ] && [ ! -e "$STUB_STATE.$f" ]; then
   : > "$STUB_STATE.$f"; texto="$(printf 'nothing useful\nline\nline\nline\nline\nline')"
 else
   texto="$(cat "$FX/$f")"
+  # An ideator writes the ids of its lens: "ids AN1-AN3" in the task.
+  if [ "$f" = "ideas.md" ]; then px_="${tarefa#*ids }"; px_="${px_%%1-*}"; texto="$(printf '%s\n' "$texto" | sed "s/XX/$px_/g")"; fi
   # A real critique targets a panel rival: the name comes from the task itself.
   if [ "$f" = "critique.md" ] || [ "$f" = "critique-ux.md" ]; then
     r_="${tarefa#*proposals/debate-}"; rival="debate-${r_%%[!a-z0-9-]*}"

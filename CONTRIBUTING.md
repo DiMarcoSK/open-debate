@@ -9,8 +9,8 @@ lib/harnesses.sh  catalog: where and how each harness installs
 lib/render.sh     translates personas into each harness's format
 lib/install.sh    init, update, uninstall, doctor, models
 template/
-  commands/       opencode's /debate command
-  entry/          orchestrator for the other harnesses, per mode
+  commands/       1 opencode command per command (debate.md, opd-brainstorm.md)
+  entry/          commands.conf, the command registry, and 1 folder per command with its skill per mode
   skills/architect-debate/
     SKILL.md      session mode protocol
     personas/     specialists, the canonical source (debate-specialist takes the seats the agenda makes, from references/specialist-template.md)
@@ -20,7 +20,18 @@ test/             suite, fixtures and fake CLIs
 docs/harnesses.md harness matrix and the evidence for each
 ```
 
-`{{SCRIPTS}}`, `{{SCRIPTS_ABS}}`, `{{SKILL_DIR}}`, `{{HARNESS}}`, `{{HARNESS_NAME}}`, `{{DELEGATE}}` and `{{DELEGATION}}` in the templates are resolved at install time.
+`{{SCRIPTS}}`, `{{SCRIPTS_ABS}}`, `{{SKILL_DIR}}`, `{{HARNESS}}`, `{{HARNESS_NAME}}`, `{{DELEGATE}}`, `{{DELEGATION}}`, `{{FRONTMATTER}}` and `{{ARGS}}` in the templates are resolved at install time.
+
+## Adding a command
+
+A command (`/debate`, `/opd-brainstorm`) is installed in every harness from 1 registry line and 3 files:
+
+1. `template/entry/commands.conf`: `name|argument hint|description`. The installer, `ready in`, `doctor` and `harnesses` read it.
+2. `template/entry/<name>/subagents.md` and `template/entry/<name>/cli.md`: the skill for harnesses with subagents and for headless harnesses, with `name: <name>` and `{{FRONTMATTER}}` at the end of the description line (Claude Code gets its `allowed-tools` there). `{{ARGS}}` becomes what the user typed; a `{{DELEGATION}}` line pulls in `entry/delegation.md`.
+3. `template/commands/<name>.md`: the opencode command, with the `agent:` that runs it.
+4. Keep the protocol in `skills/architect-debate/` (`SKILL.md` or a file in `references/`) and point the entries to it: 1 source, the entries stay thin. A new orchestrator persona with `mode: primary` becomes an opencode agent only; any other persona becomes an agent everywhere.
+
+`comandos_instalados` in `test/run.sh` checks every registered command in every harness; a command with a CLI subcommand also gets a case in `bin/open-debate`.
 
 ## Adding a harness
 

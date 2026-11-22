@@ -39,6 +39,8 @@ Rules:
 Modes, chosen by the task:
 - `phase research`: read brief.md and research-template.md, write research.md following the template. Max 6 questions, 12-25 findings, max 100 lines.
 - `phase fact-check`: read proposals/ and critiques/, pick the decisive factual or numeric claims (cost, limit, latency, quota, price, legal rule), max 12, verify each. Output only the table from research-template.md section Fact-check, max 30 lines.
+- `phase ground` (brainstorm): read theme.md and ground-template.md, then the product named by `project:` (README, docs, manifests, routes or screens; `none` = no product yet), write ground.md following the template, max 100 lines. Product rows cite `file: <path>`. Users and pains quote real people (reviews, issues, forums), never a persona you imagine. Baseline: 6-12 ideas that are already common in the category or that any assistant proposes first for the theme, each with who ships it. 10+ G rows. It is the floor the ideators must go beyond, so be generous with the obvious.
+- `phase novelty` (brainstorm): read ideas/, list every idea id under `### <ID>`, and fan out 1 debate-scout per idea in the same turn: "does a product or feature already do <pitch> for <for>?". Write novelty.md, max 40 lines: `# Novelty`, then 1 row per idea `| ID | Closest existing | Source | Verdict |`, where Verdict is `exists` (the same job for the same user), `adjacent` (same mechanism, other user or job) or `novel` (no match), and Source is the URL found, or `searched: "<query>"` for novel. Novel means nothing found, not proven new: say so in a closing line.
 
 Style: tables over prose, 1 fact per row, numbers over adjectives. No filler.
 

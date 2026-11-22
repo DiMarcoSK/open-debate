@@ -34,20 +34,22 @@ speed=40 cost=30 deadline=30
 
 ### Context and problem
 
-Driver and number.
+2 developers must ship triage in 8 weeks at 300 alerts per day.
 
 ### Considered options
 
-- A
-- B
+- Modular monolith
+- Microservices
+- Serverless functions
 
 ### Decision outcome
 
-Chosen: "A", because 80 x 60.
+Chosen: "Modular monolith", because it scores 430 against 300 and 1 deploy fits a team of 2.
 
 ### Consequences
 
-- Good: simple
+- Good: 1 deploy and 1 database to operate
+- Bad: a slow module slows the whole app until it is split
 
 ### Confirmation
 
@@ -55,7 +57,7 @@ Test in CI.
 
 ### Dissent
 
-none
+debate-k8s: portability; reopens if the app passes 10 services
 
 ## ADR-0002 Use Cloud Run
 

@@ -1,6 +1,9 @@
-# harness.sh - headless call of each harness (sourced by debate.sh and probe.sh). Needs TO, SCRIPT_DIR.
+# harness.sh - headless call of each harness (sourced by debate.sh, brainstorm.sh and probe.sh). Needs TO, SCRIPT_DIR.
 # Every harness gets the persona inside the prompt, so nothing needs to be installed in it.
 # Outside opencode the call is read-only: debate.sh writes the file, from the returned text.
+
+# The file comes from the returned text. Without this line, the agent tries to write, gets a permission denial and replies with a permission request.
+OUTPUT='OUTPUT: in this run you do not write files: do not use Write or Edit. Your whole final answer is the content of the requested file, with no comment before or after and no code fence around it. Write it in English, whatever the language of the brief.'
 
 h_binary() {
   case "$1" in
@@ -57,6 +60,9 @@ h_call() {
         set -- "$@" ${H_CLAUDE_FLAGS:-}
         [ -z "$mo" ] || set -- "$@" --model "$mo"
         # The prompt goes on stdin: an argument is capped at 128 KiB on Linux, and the inlined case files can pass that.
+        # With its files inlined, a call takes 1 turn: a 1-hour cache write (2x the input price) is never read again,
+        # a 5-minute one costs 1.25x and still covers every turn of a call that searches the web.
+        FORCE_PROMPT_CACHING_5M="${FORCE_PROMPT_CACHING_5M:-1}"; export FORCE_PROMPT_CACHING_5M
         printf '%s' "$ta" | exec $TO claude -p "$@" ;;
       codex)
         set -- --skip-git-repo-check --sandbox read-only -c web_search=live -o "$ra.fim"

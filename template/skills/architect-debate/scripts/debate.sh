@@ -197,8 +197,6 @@ if ! on_panel debate-sec && printf '%s' "$data" | grep -Eq 'lgpd|gdpr|ccpa|pci|h
   log "warning: brief with regulated data and no debate-sec on the panel; consider --panel arch,design,sec"
 fi
 
-# The file comes from the returned text. Without this line, the agent tries to write, gets a permission denial and replies with a permission request.
-OUTPUT='OUTPUT: in this run you do not write files: do not use Write or Edit. Your whole final answer is the content of the requested file, with no comment before or after and no code fence around it. Write it in English, whatever the language of the brief.'
 
 # READS: the case files of the next call, relative to the case, set next to its task like ROOM. A directory stands for
 # the .md files under it, a glob expands in the call's folder.
@@ -385,7 +383,7 @@ room() {
     *) return 0 ;;
   esac
   sd="$OUT/raw/rooms/$1-$(short "$2")"; rm -rf "$sd"; mkdir -p "$sd"
-  for x in brief.md constitution.md research.md agenda.md debate-rules.md $l ${3:-}; do
+  for x in brief.md constitution.md research.md agenda.md debate-rules.md lessons.md $l ${3:-}; do
     [ -e "$OUT/$x" ] || continue
     mkdir -p "$sd/$(parent "$x")"; cp "$OUT/$x" "$sd/$x"
   done
@@ -404,8 +402,9 @@ reads_for() {
   case "$1" in
     proposal)
       printf 'brief.md constitution.md research.md agenda.md debate-rules.md'
+      [ ! -s "$OUT/lessons.md" ] || printf ' lessons.md'
       case "$2" in debate-design|debate-ux|debate-brand) printf ' visual-contract.md' ;; esac ;;
-    critique) printf 'brief.md research.md agenda.md debate-rules.md %s' "$(rivals "$2")" ;;
+    critique) printf 'brief.md research.md agenda.md debate-rules.md%s %s' "$([ ! -s "$OUT/lessons.md" ] || printf ' lessons.md')" "$(rivals "$2")" ;;
     rebuttal) printf 'brief.md research.md research-check.md debate-rules.md proposals/%s.md critiques/ %s' "$2" "$(rivals "$2")" ;;
   esac
 }
@@ -733,5 +732,12 @@ metrics() {
 }
 log "$(metrics)"
 log "debate ok: decision.md, adr/, SDD.md, style-tile.html$([ -s "$OUT/BRANDBOOK.md" ] && printf ', BRANDBOOK.md') in $OUT"
-if [ "$SPECS_OK" = "1" ]; then log "backlog ok: BACKLOG.md$([ -s "$OUT/BACKLOG-DETAILED.md" ] && printf ', BACKLOG-DETAILED.md'), backlog.csv, backlog.json, backlog-gh.sh"
+if [ "$SPECS_OK" = "1" ]; then
+  log "backlog ok: BACKLOG.md$([ -s "$OUT/BACKLOG-DETAILED.md" ] && printf ', BACKLOG-DETAILED.md'), backlog.csv, backlog.json, backlog-gh.sh"
+  # Every phase passed its gate; validate also checks the whole case (checklists, ADRs split, assumptions in any file).
+  # The run does not end on "ok" when it fails.
+  if ! v="$("$SCRIPT_DIR/validate.sh" "$OUT" 2>&1)"; then
+    printf '%s\n' "$v" | grep -v '^validate failed' | sed 's/^/validate: /' | while IFS= read -r l; do log "$l"; done
+    abort "validate failed: fix the lines above and run again, or redo the phase with --from"
+  fi
 else log "next: fill the specs (make-specs.sh, with SPECS=0) and run debate.sh again for phase 8 (backlog)"; fi

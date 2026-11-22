@@ -74,17 +74,18 @@ prepara_render() {
   } > "$RENDER_SED"
 }
 
-# render <source>: swaps the placeholders for the install paths.
-render() {
-  case "$1" in
-    */debate.md|*/subagents.md) incluir_delegacao "$1" | sed -f "$RENDER_SED" ;;
-    *) sed -f "$RENDER_SED" "$1" ;;
-  esac
-}
+# render <source>: swaps the placeholders for the install paths; a {{DELEGATION}} line becomes delegation.md.
+render() { incluir_delegacao "$1" | sed -f "$RENDER_SED"; }
 
+# commands: the commands of entry/commands.conf, 1 line "name<TAB>hint<TAB>description" each.
+commands() { awk -F'|' '/^[^#]/ && NF >= 3 { printf "%s\t%s\t%s\n", $1, $2, $3 }' "$TEMPLATE/entry/commands.conf"; }
+# invocations: how the user calls every command in this harness, "/debate <idea>, /other <hint>".
+invocations() { commands | awk -F'\t' -v p="$H_PREFIX" '{ printf "%s%s%s%s", (NR > 1 ? ", " : ""), p, $1, ($2 == "" ? "" : " " $2) } END { print "" }'; }
+
+# entrada <dir> <name> <description>: the command's skill (its subagents or cli flavor) and, in Gemini and Qwen, its command.
 entrada() {
-  mkdir -p "$1/$H_SKILLS/debate"
-  e="$TEMPLATE/entry/cli.md"; [ "$H_MODE" = "subagents" ] && e="$TEMPLATE/entry/subagents.md"
+  mkdir -p "$1/$H_SKILLS/$2"
+  e="$TEMPLATE/entry/$2/cli.md"; [ "$H_MODE" = "subagents" ] && e="$TEMPLATE/entry/$2/subagents.md"
   args="the text the user wrote after the command"; extra=""
   if [ "$H_FMT" = "claude" ]; then
     args='$ARGUMENTS'
@@ -94,15 +95,12 @@ allowed-tools: Bash($SCRIPTS/*), Bash($SCRIPTS_ABS/*)"
   render "$e" | EXTRA="$extra" ARGS="$args" awk '
     { i = index($0, "{{FRONTMATTER}}"); if (i) $0 = substr($0, 1, i - 1) ENVIRON["EXTRA"] substr($0, i + 15)
       i = index($0, "{{ARGS}}"); if (i) $0 = substr($0, 1, i - 1) ENVIRON["ARGS"] substr($0, i + 8)
-      print }' > "$1/$H_SKILLS/debate/SKILL.md"
+      print }' > "$1/$H_SKILLS/$2/SKILL.md"
   case "$H_FMT" in
     gemini|qwen)
       mkdir -p "$1/$H_CMDS"
-      cat > "$1/$H_CMDS/debate.toml" <<EOF
-description = "Architecture and design debate: from an idea to SDD, ADRs, specs and backlog"
-prompt = """Read $SKILL_DIR/../debate/SKILL.md and follow it. Idea to debate: {{args}}"""
-EOF
-      ;;
+      printf 'description = %s\nprompt = """Read %s/../%s/SKILL.md and follow it. Arguments: {{args}}"""\n' \
+        "$(toml_str "$3")" "$SKILL_DIR" "$2" > "$1/$H_CMDS/$2.toml" ;;
   esac
 }
 
@@ -117,16 +115,21 @@ stage() {
     render "$TEMPLATE/skills/$SKILL/$f" > "$1/$H_SKILLS/$SKILL/$f"
   done
   p="$TEMPLATE/skills/$SKILL/personas"
+  # Native (opencode): every persona, the orchestrators (mode: primary) included, and 1 command file per command.
+  # Elsewhere the main session orchestrates: each command is a skill and only the specialists become agents.
   case "$H_MODE" in
     native)
       mkdir -p "$1/$H_AGENTS" "$1/$H_CMDS"
-      for f in "$p"/debate*.md; do render "$f" > "$1/$H_AGENTS/$(basename "$f")"; done
-      render "$TEMPLATE/commands/debate.md" > "$1/$H_CMDS/debate.md" ;;
+      for f in "$p"/*.md; do render "$f" > "$1/$H_AGENTS/$(basename "$f")"; done
+      commands | while IFS="$(printf '\t')" read -r n h d; do render "$TEMPLATE/commands/$n.md" > "$1/$H_CMDS/$n.md"; done ;;
     *)
-      entrada "$1"
+      commands | while IFS="$(printf '\t')" read -r n h d; do entrada "$1" "$n" "$d"; done
       if [ -n "$H_AGENTS" ]; then
         mkdir -p "$1/$H_AGENTS"
-        for f in "$p"/debate-*.md; do render_agent "$f" "$1/$H_AGENTS/$(agent_file "$(basename "$f" .md)")"; done
+        for f in "$p"/*.md; do
+          [ "$(fm_get "$f" mode)" != "primary" ] || continue
+          render_agent "$f" "$1/$H_AGENTS/$(agent_file "$(basename "$f" .md)")"
+        done
       fi ;;
   esac
 }
@@ -221,7 +224,7 @@ do_install() {
     action=repair; [ "$novo" = "1" ] && action=apply
     "$TARGET/$H_SKILLS/$SKILL/scripts/models.sh" "$action" > /dev/null || echo "warning: models not applied, run: open-debate models apply"
   fi
-  [ "$modo" = "init" ] && printf 'ready in %s: %s\n' "$H_NAME" "$H_INVOKE"
+  [ "$modo" = "init" ] && printf 'ready in %s: %s\n' "$H_NAME" "$(invocations)"
   return 0
 }
 
@@ -262,7 +265,7 @@ doctor_harness() {
     $1 == "-" { print "MISSING " $2; next } $1 != h[$2] { e++ } END { print "EDIT " e + 0 }' "$MANIFEST" -)"
   printf '%s\n' "$r" | grep '^MISSING ' && falta=1
   edit="$(printf '%s\n' "$r" | sed -n 's/^EDIT //p')"
-  printf 'ok    %-9s installed in %s (version %s, call it with %s)\n' "$H_ID" "$TARGET" "$(cat "$VERSAO" 2>/dev/null || echo '?')" "$H_INVOKE"
+  printf 'ok    %-9s installed in %s (version %s, call it with %s)\n' "$H_ID" "$TARGET" "$(cat "$VERSAO" 2>/dev/null || echo '?')" "$(invocations)"
   [ "$edit" -eq 0 ] || printf 'warn  %-9s %s edited file(s), update does not overwrite them\n' "$H_ID" "$edit"
   [ "$(cat "$VERSAO" 2>/dev/null)" = "$(version)" ] || printf 'warn  %-9s installed version differs from the package %s, run: open-debate update\n' "$H_ID" "$(version)"
   rc2="$falta"
@@ -305,7 +308,7 @@ do_harnesses() {
     resolve_target "$h"
     d=no; if h_detected; then d=yes; fi
     i=no; if [ -f "$MANIFEST" ]; then i=yes; fi
-    printf '%-9s %-20s %-9s %-10s %-10s %s\n' "$h" "$H_NAME" "$d" "$i" "$H_MODE" "$H_INVOKE"
+    printf '%-9s %-20s %-9s %-10s %-10s %s\n' "$h" "$H_NAME" "$d" "$i" "$H_MODE" "$(invocations)"
   done
   echo
   echo 'Modes: native and subagents run the panel as subagents in the session; cli runs each specialist as a headless process.'

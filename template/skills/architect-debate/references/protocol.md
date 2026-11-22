@@ -22,6 +22,10 @@ cases/<slug>/
   BACKLOG.md  backlog.csv  backlog.json  backlog-gh.sh   phase 8, debate-pm + export
   backlog/audit.md             phase 8b, debate-auditor: completeness from an empty repo to an operated product
   backlog/cards/<nn>.md  BACKLOG-DETAILED.md   phase 8c, debate-arch: 1 card per item, what and how
+  VERDICT.md  RECEIPT.md  raw/quiz.key   phase 9b, verdict.sh: decisions in 1 screen, a client page, the teach-back key
+  HANDOFF.md  build/<Bnn>.md   phase 10, handoff.sh and item.sh: the build loop and 1 context file per item
+  appeals/<nn>-adr-<NNNN>/{appeal,evidence,debate-arch,debate-pm,ruling}   appeal.sh during the build
+  ../lessons.md                appeal.sh apply: what broke in past builds of this folder; copied into every new case
   raw/   raw json, stderr, summary.log, metrics.tsv, archive/ (outputs replaced by --from)
 ```
 
@@ -45,6 +49,8 @@ cases/<slug>/
 | 8 backlog | 15+ items, 4+ phases, every item with Acceptance, source, est S/M/L; deps exist and no cycle; every polish.md tag, spec, task and ADR covered; capacity math adds up and the plan fits; DoD |
 | 8b completeness | Verdict; 1 row per completeness.md stage as covered, gap or n/a; covered cites B ids that exist; n/a with a reason; GAPS carries Gn rows and debate-pm adds their items, then the backlog gate runs again |
 | 8c cards | every item before Post-launch has a card with What, How in 2+ steps, Files, Done when in Given/When/Then and Test; no placeholder |
+| appeal | each of debate-arch and debate-pm: Position keep, amend or supersede, an Evidence excerpt found literally in evidence.txt, Reason |
+| ruling | Ruling keep, amend or supersede; literal Evidence; Reason; Lesson; amend carries the full ADR block with the same number, supersede with the next free one |
 
 ## Limits
 

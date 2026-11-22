@@ -12,6 +12,34 @@ PANEL_BASE="debate-arch debate-ux debate-pm"
 PANEL_CAP=8
 AWKS="${TOK%/*}"
 CATALOG="$AWKS/../references/panel.conf"
+LENSES_CONF="$AWKS/../references/lenses.conf"
+
+# --- appeals (appeal.sh): open_appeal <case> prints the appeal folder not yet applied, or nothing.
+open_appeal() { for d in "$1"/appeals/[0-9][0-9]-*/; do [ -f "${d}appeal.md" ] || continue; grep -q '^Applied:' "${d}appeal.md" || printf '%s' "${d%/}"; done; }
+# evidence_ok <file> <evidence.txt>: the Evidence: "<quote>" line exists and the quote is literal in the evidence.
+evidence_ok() {
+  q="$(sed -n 's/^Evidence:[[:space:]]*"\(.*\)".*/\1/p' "$1" | head -1)"
+  if [ -z "$q" ]; then printf '; no Evidence: "<literal line from evidence.txt>"'
+  elif [ "${#q}" -lt 8 ]; then printf '; Evidence quote under 8 characters'
+  elif ! grep -qF -- "$q" "$2" 2>/dev/null; then printf '; Evidence quote not found literally in evidence.txt'; fi
+}
+
+# --- brainstorm: lenses drawn by brainstorm.sh new, 1 line "lens: <id> | <stimulus>" each in meta.txt
+lenses_of() { sed -n 's/^lens: \([a-z][a-z-]*\) |.*/\1/p' "$1/meta.txt" 2>/dev/null | tr '\n' ' '; }
+stimulus_of() { sed -n "s/^lens: $2 | //p" "$1/meta.txt" 2>/dev/null | head -1; }
+# lens_field <lens> <n>: field n of its lenses.conf line (2 prefix, 3 name, 4 move, 5 stimuli).
+lens_field() { awk -F'|' -v l="$1" -v n="$2" '$1 == l { print $n; exit }' "$LENSES_CONF"; }
+# pain_of <case> <lens>: the Users and pains fact of ground.md this lens starts from. The lenses get different pains,
+# turned by the seed: left to themselves, every lens anchors on the loudest pain and the ideas cluster there.
+pain_of() {
+  [ -s "$1/ground.md" ] || return 0
+  awk -v want="$2" -v lenses="$(lenses_of "$1")" -v seed="$(sed -n 's/^seed: //p' "$1/meta.txt" | head -1)" '
+    /^## / { on = (tolower($0) ~ /^## users and pains/); next }
+    on && match($0, /^\|[ *]*G[0-9]+[ *]*\|/) { x = substr($0, RSTART, RLENGTH); gsub(/[|* ]/, "", x); p[k++] = x }
+    END { if (!k) exit; n = split(lenses, l, " "); for (i = 1; i <= n; i++) if (l[i] == want) print p[(i - 1 + seed) % k] }' "$1/ground.md"
+}
+# idea_ids <case>: the ### <ID> headings of ideas/, 1 per line.
+idea_ids() { cat "$1"/ideas/*.md 2>/dev/null | sed -n 's/^### \([A-Z][A-Z][0-9][0-9]*\).*/\1/p'; }
 
 # What the brief actually states: values without labels, without the Out of scope line and without negations, at the
 # start of a value or after a comma ("web app, no native app");
@@ -125,7 +153,10 @@ line_cap() {
     critique:debate-ux) printf 40 ;;
     proposal:*) printf 55 ;;
     critique:*) printf 25 ;;
-    research:*) printf 100 ;;
+    research:*|ground:*) printf 100 ;;
+    ideas:*|converge:*|ruling:*) printf 60 ;;
+    appeal:*) printf 25 ;;
+    novelty:*) printf 40 ;;
     agenda:*) printf 24 ;;
     decision:*) printf 150 ;;
     audit:*) printf 25 ;;
@@ -142,20 +173,22 @@ size_ok() {
   [ "$n" -le $((c * 3 / 2)) ] || printf '; %s lines, cap %s: cut what does not decide' "$n" "$c"
 }
 
-# Rn ids cited that do not exist in research.md: a number with an invented source.
+# refs_ok <file> <case> [source] [letter]: ids cited that do not exist in the source's table (default research.md, Rn):
+# a number with an invented source. The brainstorm checks Gn and Bn against ground.md.
 refs_ok() {
-  awk -v rs="$2/research.md" '
+  awk -v rs="$2/${3:-research.md}" -v nm="${3:-research.md}" -v p="${4:-R}" '
     BEGIN {
+      re = "^\\|[ *]*" p "[0-9]+[ *]*\\|"
       while ((getline l < rs) > 0) {
         if (l ~ /^skipped/) sk = 1
-        if (match(l, /^\|[ *]*R[0-9]+[ *]*\|/)) { x = substr(l, RSTART, RLENGTH); gsub(/[^R0-9]/, "", x); ok[x] = 1; n++ }
+        if (match(l, re)) { x = substr(l, RSTART, RLENGTH); gsub(/[|* ]/, "", x); ok[x] = 1; n++ }
       }
       if (sk || !n) exit
     }
-    # Rn token bounded by chars outside [A-Za-z0-9_-], as in prose: "R3," and "(R3)" count, "R3a" and "AR3" do not.
+    # Id token bounded by chars outside [A-Za-z0-9_-], as in prose: "R3," and "(R3)" count, "R3a" and "AR3" do not.
     { l = $0; gsub(/[^A-Za-z0-9_-]/, " ", l); k = split(l, w, " ")
-      for (i = 1; i <= k; i++) if (w[i] ~ /^R[0-9]+$/ && !(w[i] in ok) && !(w[i] in seen)) { seen[w[i]] = 1; r = r " " w[i] } }
-    END { if (r != "") printf "; cites an id missing from research.md:%s", r }' "$1"
+      for (i = 1; i <= k; i++) if (w[i] ~ ("^" p "[0-9]+$") && !(w[i] in ok) && !(w[i] in seen)) { seen[w[i]] = 1; r = r " " w[i] } }
+    END { if (r != "") printf "; cites an id missing from %s:%s", nm, r }' "$1"
 }
 # missing_d <case> <file>: agenda Dn ids the file does not cite, in a single awk.
 missing_d() {
@@ -231,7 +264,8 @@ check() {
   [ "$phase" = "spec" ] && { check_spec "$f"; return 0; }
   if [ ! -s "$f" ]; then printf 'output missing or empty'; return 0; fi
   case "$phase" in
-    proposal|critique|completeness) c="$(parent "$(parent "$f")")" ;;
+    proposal|critique|completeness|ideas) c="$(parent "$(parent "$f")")" ;;
+    appeal|ruling) c="$(parent "$(parent "$(parent "$f")")")" ;;
     *) c="$(parent "$f")" ;;
   esac
   m="$(size_ok "$phase" "$a" "$f")"
@@ -409,6 +443,116 @@ check() {
               if (gap && !g) print "a stage is a gap but there is no | Gn | row" }' "$f")"
       [ -z "$r" ] || m="$m; $(printf '%s' "$r" | tr '\n' ';' | sed 's/;$//; s/;/; /g')"
       if grep -q '^Verdict: GAPS' "$f"; then grep -Eq '^\|[ *]*G[0-9]+[ *]*\|' "$f" || m="$m; GAPS without a | Gn | row"; fi ;;
+    appeal)
+      v="$(sed -n 's/^Position:[[:space:]]*//p' "$f" | head -1 | tr '[:upper:]' '[:lower:]' | awk '{ print $1 }')"
+      case "$v" in keep|amend|supersede) ;; *) m="$m; Position: keep|amend|supersede missing" ;; esac
+      m="$m$(evidence_ok "$f" "${f%/*}/evidence.txt")"
+      grep -q '^Reason:' "$f" || m="$m; no Reason: line" ;;
+    ruling)
+      v="$(sed -n 's/^Ruling:[[:space:]]*//p' "$f" | head -1 | tr '[:upper:]' '[:lower:]' | awk '{ print $1 }')"
+      m="$m$(evidence_ok "$f" "${f%/*}/evidence.txt")"
+      grep -q '^Reason:' "$f" || m="$m; no Reason: line"
+      grep -q '^Lesson:' "$f" || m="$m; no Lesson: line (1 line for the next debate, or none)"
+      ap="${f%/*}/appeal.md"; adr="$(sed -n 's/^ADR: //p' "$ap" | head -1)"; nx="$(sed -n 's/^Next free ADR number: //p' "$ap" | head -1)"
+      want=""; case "$v" in keep) ;; amend) want="$adr" ;; supersede) want="$nx" ;; *) m="$m; Ruling: keep|amend|supersede missing" ;; esac
+      if [ -n "$want" ]; then
+        grep -Eq "^#+[[:space:]]*$want([^0-9]|\$)" "$f" || m="$m; $v needs the full ADR block headed $want"
+        has "$f" 'decision outcome' || m="$m; the ADR block has no Decision outcome"
+        has "$f" 'considered options' || m="$m; the ADR block has no Considered options"
+      fi ;;
+    ground)
+      g="$(grep -cE '^\|[ *]*G[0-9]+[ *]*\|' "$f" || true)"
+      [ "$g" -ge 10 ] || m="$m; $g fact(s) in | Gn | rows, minimum 10"
+      u="$(grep -Eo 'https?://[^] )|>"]+' "$f" | sort -u | wc -l | tr -d ' ')"
+      [ "$u" -ge 5 ] || m="$m; $u distinct URL(s), minimum 5"
+      s="$(grep -E '^\|[ *]*G[0-9]+[ *]*\|' "$f" | grep -Evi 'https?://|file:|unverified' | sed 's/^|[ *]*\(G[0-9]*\).*/\1/' | tr '\n' ' ' || true)"
+      [ -z "$s" ] || m="$m; fact with neither URL, file: nor unverified: $s"
+      b="$(grep -cE '^\|[ *]*B[0-9]+[ *]*\|' "$f" || true)"
+      { [ "$b" -ge 6 ] && [ "$b" -le 12 ]; } || m="$m; $b baseline idea(s), expected 6-12 rows | Bn |"
+      has "$f" '^## gaps' || m="$m; no Gaps section" ;;
+    ideas)
+      l="${f##*/}"; l="${l%.md}"; px="$(lens_field "$l" 2)"
+      [ -n "$px" ] || { printf 'unknown lens %s (references/lenses.conf)' "$l"; return 0; }
+      r="$(awk -v px="$px" '
+        function close_idea() { if (id == "") return
+          for (i = 1; i <= nf; i++) if (!(fl[i] in got)) miss = miss " " id ":" fl[i]
+          if (("anchor" in got) && !an) miss = miss " " id ":Anchor-without-Gn"
+          if (("beyond" in got) && !be) miss = miss " " id ":Beyond-without-Bn"
+          if (("first test" in got) && !go) miss = miss " " id ":First-test-without-go-if" }
+        BEGIN { nf = split("pitch|for|mechanism|anchor|stimulus|beyond|why now|first test", fl, "|") }
+        /^## / { close_idea(); id = ""; ty = (tolower($0) ~ /^## typical/); next }
+        ty && /p=0?\.[0-9]/ { typ++ }
+        /^### / { close_idea(); id = ""; split("", got); an = be = go = 0
+          x = $2; sub(/:$/, "", x); if (x ~ ("^" px "[0-9]+$")) { id = x; n++ } else bad = bad " " x; next }
+        id != "" && /^- [A-Za-z ]+:/ { k = tolower($0); sub(/^- /, "", k); sub(/:.*/, "", k); got[k] = 1
+          if (k == "anchor" && $0 ~ /G[0-9]+/) an = 1
+          if (k == "beyond" && $0 ~ /B[0-9]+/) be = 1
+          if (k == "first test" && tolower($0) ~ /go if/) go = 1 }
+        END { close_idea()
+          if (n < 3) print n + 0 " idea(s), expected 3 headings ### " px "1 <name>"
+          if (bad != "") print "idea id outside the lens prefix " px ":" bad
+          if (typ < 3) print "Typical section with " typ + 0 " idea(s) with p=, expected 3-5"
+          if (miss != "") print "missing fields" miss }' "$f")"
+      [ -z "$r" ] || m="$m; $(printf '%s' "$r" | tr '\n' ';' | sed 's/;$//; s/;/; /g')"
+      m="$m$(refs_ok "$f" "$c" ground.md G)$(refs_ok "$f" "$c" ground.md B)"
+      pn="$(pain_of "$c" "$l")"
+      if [ -n "$pn" ] && ! grep -Eq "^- Anchor:.*(^|[^0-9A-Za-z])$pn([^0-9]|\$)" "$f"; then m="$m; no idea anchors on $pn, the pain this lens starts from"; fi ;;
+    novelty)
+      r="$(awk -v want="$(idea_ids "$c" | tr '\n' ' ')" '
+        BEGIN { k = split(want, w, " ") }
+        /^\|[ *]*[A-Z][A-Z][0-9]+[ *]*\|/ { n = split($0, col, "|"); id = col[2]; gsub(/[ *]/, "", id)
+          v = tolower(col[n - 1]); gsub(/[ *`]/, "", v); src = col[n - 2]; row[id] = 1
+          if (v != "exists" && v != "adjacent" && v != "novel") print id " with verdict \"" v "\", expected exists|adjacent|novel"
+          else if (v != "novel" && src !~ /https?:\/\//) print id " is " v " without the URL of what exists"
+          else if (v == "novel" && src !~ /https?:\/\/|searched/) print id " is novel without searched: <query>" }
+        END { for (i = 1; i <= k; i++) if (!(w[i] in row)) miss = miss " " w[i]
+          if (k == 0) print "no idea in ideas/ to check"
+          if (miss != "") print "ideas without a row:" miss }' "$f")"
+      [ -z "$r" ] || m="$m; $(printf '%s' "$r" | tr '\n' ';' | sed 's/;$//; s/;/; /g')" ;;
+    converge)
+      r="$(awk -v ids=" $(idea_ids "$c" | tr '\n' ' ') " -v nov="$c/novelty.md" '
+        function trim(x) { gsub(/[*`]/, "", x); sub(/^[[:space:]]+/, "", x); sub(/[[:space:]]+$/, "", x); return x }
+        BEGIN { while ((getline l < nov) > 0) if (match(l, /^\|[ *]*[A-Z][A-Z][0-9]+[ *]*\|/)) {
+            n = split(l, col, "|"); x = trim(col[2]); v = tolower(trim(col[n - 1])); ver[x] = v } }
+        /^## / { sec = tolower($0); intab = 0; next }
+        !/^\|/ { intab = 0 }
+        /^\|/ && !intab { n = split($0, col, "|"); split("", h); for (i = 2; i < n; i++) h[i] = tolower(trim(col[i])); intab = 1; sep = 1; next }
+        /^\|/ && sep { sep = 0; next }
+        /^\|[ *]*P[0-9]+[ *]*\|/ { n = split($0, col, "|"); p = trim(col[2])
+          if (sec ~ /proposals/) { np++; prop[p] = 1; fr = ""; for (i = 2; i < n; i++) if (h[i] == "from") fr = col[i]
+            all = 1; cnt = 0; s = fr
+            while (match(s, /[A-Z][A-Z][0-9]+/)) { x = substr(s, RSTART, RLENGTH); s = substr(s, RSTART + RLENGTH); cnt++
+              if (index(ids, " " x " ") == 0) print p " cites " x ", which is not an idea in ideas/"
+              if (ver[x] != "exists") all = 0 }
+            if (!cnt) print p " without a From idea id"
+            if (cnt && all) exist[p] = 1 }
+          if (sec ~ /scores/) { scored[p] = 1
+            for (i = 2; i < n; i++) {
+              if (h[i] == "novelty" && (p in exist) && trim(col[i]) + 0 > 1)
+                print p " scores novelty " trim(col[i]) " but every idea it comes from exists (novelty.md): 0-1"
+              if (h[i] == "total") tot[p] = trim(col[i]) + 0
+              if (h[i] == "feasibility") fea[p] = trim(col[i]) + 0 } }
+          next }
+        /^Pick:/ { pk = $0 } /^Wildcard:/ { wc = $0 } /^Would change the pick:/ { wo = 1 }
+        END { if (np < 3 || np > 5) print np + 0 " proposal(s), expected 3-5 rows | Pn | in Proposals"
+          for (p in prop) if (!(p in scored)) print p " has no score row"
+          if (pk == "") print "no Pick: line"
+          else { match(pk, /P[0-9]+/); x = (RLENGTH > 0) ? substr(pk, RSTART, RLENGTH) : ""
+            if (!(x in prop)) print "Pick: names no proposal of the table"
+            else { for (p in tot) if (tot[p] > tot[x] && tolower(pk) !~ /override/)
+                print "Pick: " x " totals " tot[x] ", below " p " (" tot[p] "): pick the top Total or write override and the reason" } }
+          if (wc == "") print "no Wildcard: line"
+          else if (tolower(wc) !~ /same as the pick/) { match(wc, /P[0-9]+/); x = (RLENGTH > 0) ? substr(wc, RSTART, RLENGTH) : ""
+            if (!(x in prop)) print "Wildcard: names no proposal of the table"
+            else if ((x in fea) && fea[x] < 3) print "Wildcard: " x " scores feasibility " fea[x] ", the wildcard needs 3+" }
+          if (!wo) print "no Would change the pick: line" }' "$f")"
+      [ -z "$r" ] || m="$m; $(printf '%s' "$r" | tr '\n' ';' | sed 's/;$//; s/;/; /g')"
+      w="$(grep -m1 -E '^[a-z]+=[0-9]+' "$f" || true)"
+      for k in novelty fit value feasibility; do case " $w" in *" $k="*) ;; *) m="$m; weights without $k=" ;; esac; done
+      r="$(awk -f "$AWKS/scores.awk" "$f" 2>&1)" \
+        || m="$m; $(printf '%s\n' "$r" | sed 's/^FAIL //' | head -6 | tr '\n' ';' | sed 's/;$//; s/;/; /g')"
+      has "$f" '^## pre-mortem' || m="$m; no Pre-mortem section"
+      m="$m$(refs_ok "$f" "$c" ground.md G)" ;;
     track)
       has "$f" 'Acceptance' || m="$m; items without Acceptance"
       [ "$(grep -c '^- ' "$f")" -ge 8 ] || m="$m; fewer than 8 items" ;;

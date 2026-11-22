@@ -87,7 +87,9 @@ open-debate init --project                 # current project instead of user lev
 | `BACKLOG.md`, `backlog.csv`, `backlog.json`, `backlog-gh.sh` | Backlog through launch, with dependencies, estimates and critical path |
 | `backlog/audit.md` | Completeness audit of the backlog, stage by stage from an empty repository to a launched, operated product; every gap becomes an item |
 | `BACKLOG-DETAILED.md` | 1 card per item: what to build, how in steps, files, interfaces, Given/When/Then and the test. Also in the CSV and the GitHub issues |
-| `HANDOFF.md` | Written when you choose to start building: the loop over the backlog, 1 item at a time with its test and commit |
+| `VERDICT.md`, `RECEIPT.md` | Every decision in 1 screen: chosen, over what, its cost and the objection still standing. Then a teach-back quiz, so you open only the ADRs you miss. `RECEIPT.md` is the same decisions in plain words for a client: what we chose and why, what it costs, what is not included and the delivery plan |
+| `HANDOFF.md`, `build/` | Written when you choose to start building: the loop over the backlog, 1 item at a time with its test and commit. `build/<Bnn>.md` gives each item its card plus only the ADR decisions, spec tasks and requirements it traces to, so the coding agent reads about 35 lines instead of the whole case |
+| `appeals/`, `lessons.md` | When the build breaks a decision: a 3-agent appeal keeps, amends or supersedes that one ADR, with the failing log as literal evidence. The lesson goes to `lessons.md`, which the next debate in the same folder reads |
 
 ## Why it works
 
@@ -109,7 +111,23 @@ open-debate init --project                 # current project instead of user lev
 
 The agent asks up to 6 intake questions and runs the phases. The case lives in `cases/<slug>/`. Running `/debate` again on an existing case resumes from the first phase that fails its gate.
 
-When the debate ends, the agent asks whether to start building. On yes it writes `HANDOFF.md`, the build loop over the backlog and its cards, and in opencode it switches the session to the `build` agent, which starts on the first item by itself. In other harnesses the same session starts building. See [hand-off](docs/harnesses.md#hand-off-to-building).
+When the debate ends, you get the decisions in 1 screen (`VERDICT.md`) and a short quiz on them instead of 2,000 lines to read. Only the ADRs you get wrong need opening. Then the agent asks whether to start building. On yes it writes `HANDOFF.md`, the build loop over the backlog and its cards, and in opencode it switches the session to the `build` agent, which starts on the first item by itself. In other harnesses the same session starts building. See [hand-off](docs/harnesses.md#hand-off-to-building).
+
+### Before the debate: brainstorm
+
+```text
+/opd-brainstorm <theme> [--lenses analogy,outcome] [--seed n] [--no-product]
+```
+
+For when you have a theme instead of an idea ("let's be creative, new features for the product"). Ask an assistant for ideas and every user gets the same list; this command is built to avoid that:
+
+1. It reads your product (README, docs, manifests), real users' complaints, competitors and recent shifts, and lists the obvious ideas as a baseline to go beyond.
+2. A script draws 4 creative lenses (far analogy, inverted assumption, underserved outcome, why now, business model, extreme constraint), each with a random stimulus. The draw comes from a seed, not from the model.
+3. 1 ideator per lens works blind, discards its own most typical ideas first, and anchors every idea to a fact about your product.
+4. A scout checks each idea against what already exists. A judge merges duplicates and scores novelty, fit, value and feasibility, and gates check the arithmetic. You also get a wildcard, the most novel proposal that is still feasible.
+5. You pick 1 of the 3-5 proposals, and it becomes a debate case with the brief pre-filled, ready for `/debate`.
+
+The protocol is in [`brainstorm.md`](template/skills/architect-debate/references/brainstorm.md), and the research behind each step is in [docs/brainstorm.md](docs/brainstorm.md). Headless: `open-debate brainstorm new "<theme>"`, then `open-debate brainstorm run <dir> --harness claude` (add `--mix claude,codex` to put each lens on another model family), then `open-debate brainstorm seed <dir> P2`.
 
 ### From the command line
 
@@ -166,7 +184,11 @@ open-debate run "$case" --harness claude --mix claude,codex,gemini
 | `specs` | Create specs by hand, for use with `SPECS=0` |
 | `gate`, `validate` | Run the gates for one phase or the whole case |
 | `backlog`, `tile` | Export the backlog and the style tile |
-| `handoff` | Write `HANDOFF.md` with the next item; in an opencode session, switch to the `build` agent |
+| `handoff` | Write `HANDOFF.md` with the next item and `build/` per item; in an opencode session, switch to the `build` agent |
+| `verdict [receipt\|quiz\|check 1=a ...]` | Decisions in 1 screen, the client receipt, the teach-back quiz and its grade |
+| `item [Bnn...]` | Rebuild `build/<Bnn>.md`, the context of 1 item |
+| `appeal <Bnn\|ADR-NNNN> <evidence>`, `appeal apply` | Reopen the decision the build broke, then apply the ruling |
+| `brainstorm new\|lenses\|run\|seed` | The `/opd-brainstorm` folder, its headless run and the seed of a debate case |
 
 `run` variables: `HARNESS`, `MODEL`, `MODEL_FALLBACK` (space-separated chain), `MIX`, `ROUTES`, `HARNESS_CMD`, `PANEL`, `FROM`, `RETRIES=2`, `TIMEOUT=600`, `BACKOFF=20`, `PARALLEL=6` (simultaneous calls, 0 for no limit), `MAX_CALLS=0` (hard limit per run, 0 for none), `MIN_LINES=5`, `RESEARCH=1`, `AGENDA=1`, `FACTCHECK=1`, `SPECS=1`, `REVIEW=1` (SDD and backlog audits), `CARDS=1`, `REPAIR=1`, `FRESH=0`.
 

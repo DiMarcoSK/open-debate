@@ -89,6 +89,8 @@ After the delivery, the orchestrator asks whether to start building. On yes, `ha
 | opencode without the API, or a standalone server | the orchestrator asks you to press Tab, pick `build` and send `follow <case>/HANDOFF.md` |
 | other harnesses | the main session follows `HANDOFF.md` itself |
 
+It also writes `build/<Bnn>.md` per item: the card plus only the ADR decisions, spec tasks and requirements the item traces to, so the build agent reads 1 short file per item instead of the case. When an item fails its test twice, or can only pass by going against an ADR, the loop runs `appeal.sh` instead of a third retry. debate-arch and debate-pm take a position, debate-judge rules keep, amend or supersede with the failing log as evidence, and `appeal.sh <case> apply` updates `adr/` and `build/` and writes the lesson to `lessons.md` for the next debate in that folder. In harnesses with subagents the build session delegates the 3 calls; elsewhere it writes them in the same formats.
+
 `open-debate handoff <case>` writes the file again later, with the next open item.
 
 ## Other CLIs

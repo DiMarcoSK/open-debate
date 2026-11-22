@@ -34,6 +34,12 @@ Install:
 
   Options: --harness a,b  --all  --project  --force  --yes
 
+Brainstorm (/opd-brainstorm), before the debate:
+  open-debate brainstorm new "<theme>" [dest]   creates <dest>/brainstorms/<slug>/ and draws lenses and stimuli (--lenses a,b --seed n --no-product)
+  open-debate brainstorm lenses <dir>           the task of each lens, for a session to delegate
+  open-debate brainstorm run <dir>              ground, blind ideas per lens, novelty, converge (--harness x --mix a,b)
+  open-debate brainstorm seed <dir> <Pn>        creates the debate case from the picked proposal
+
 Cases:
   open-debate new "<idea>" [dest]           creates the case, default dest=cases
   open-debate run <case> [options]          runs the whole protocol, up to the backlog
@@ -44,6 +50,9 @@ Cases:
   open-debate validate <case> [--brief]     runs every gate of the case
   open-debate backlog <case>                exports CSV, JSON and a gh script
   open-debate handoff <case> [agent]        writes HANDOFF.md to start building; in an opencode session, switches to build
+  open-debate verdict <case> [receipt|quiz|check 1=a ...]   VERDICT.md (decisions in 1 screen), RECEIPT.md (for a client), teach-back quiz
+  open-debate item <case> [Bnn...]          build/<Bnn>.md: 1 item with only the decisions and requirements it traces to
+  open-debate appeal <case> <Bnn|ADR-NNNN> <evidence> | apply   reopens 1 decision the build broke; apply keeps, amends or supersedes it
   open-debate tile <case> [source.md]       generates style-tile.html and tokens
 
   Run options: --harness x  --mix a,b,c  --fallback model,harness:model  --panel design,brand,sec  --rounds 1-3  --from <phase>
@@ -157,6 +166,29 @@ default_run() {
   return 1
 }
 
+# cmd_brainstorm <new|lenses|run|seed> [args] [options]: the /opd-brainstorm folder and its headless run.
+cmd_brainstorm() {
+  sub="${1:-}"; [ -n "$sub" ] || { usage >&2; exit 2; }; shift
+  a1=""; a2=""; n=0
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --harness) HARNESS="$2"; shift 2 ;;
+      --mix) MIX="$(csv "$2")"; export MIX; shift 2 ;;
+      --lenses) LENSES="$(csv "$2")"; export LENSES; shift 2 ;;
+      --seed) SEED="$2"; export SEED; shift 2 ;;
+      --no-product) PRODUCT=none; export PRODUCT; shift ;;
+      -*) echo "error: unknown option: $1" >&2; exit 2 ;;
+      *) n=$((n + 1)); if [ "$n" -eq 1 ]; then a1="$1"; else a2="$1"; fi; shift ;;
+    esac
+  done
+  [ -n "$a1" ] || { usage >&2; exit 2; }
+  if [ "$sub" = "run" ] && [ -z "${HARNESS:-}" ]; then
+    HARNESS="$(default_run)" || { echo "error: no harness found on PATH (see: open-debate harnesses)" >&2; exit 2; }
+  fi
+  [ -z "${HARNESS:-}" ] || export HARNESS
+  if [ -n "$a2" ]; then run_script brainstorm.sh "$sub" "$a1" "$a2"; else run_script brainstorm.sh "$sub" "$a1"; fi
+}
+
 cmd_run() {
   case_dir=""; rounds=""
   while [ "$#" -gt 0 ]; do
@@ -232,6 +264,7 @@ case "$cmd" in
     esac ;;
   new) need_args "$#" 1; run_script new-debate.sh "$@" ;;
   run) need_args "$#" 1; cmd_run "$@" ;;
+  brainstorm) need_args "$#" 2; cmd_brainstorm "$@" ;;
   specs) need_args "$#" 2; run_script make-specs.sh "$@" ;;
   status)
     # Without a case: 1 line per case under ./cases with its next phase.
@@ -248,6 +281,9 @@ case "$cmd" in
   validate) need_args "$#" 1; run_script validate.sh "$@" ;;
   backlog) need_args "$#" 1; run_script backlog-export.sh "$@" ;;
   handoff) need_args "$#" 1; run_script handoff.sh "$@" ;;
+  verdict) need_args "$#" 1; run_script verdict.sh "$@" ;;
+  item) need_args "$#" 1; run_script item.sh "$@" ;;
+  appeal) need_args "$#" 2; run_script appeal.sh "$@" ;;
   tile) need_args "$#" 1; run_script style-tile.sh "$@" ;;
   *) echo "error: unknown command: $cmd" >&2; usage >&2; exit 2 ;;
 esac

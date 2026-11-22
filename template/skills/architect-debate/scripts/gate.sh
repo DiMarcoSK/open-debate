@@ -1,6 +1,8 @@
 #!/bin/sh
 # gate.sh <case> <phase> [agent...] - the gate of 1 phase, for the session mode orchestrator.
 # Phases: brief research agenda proposal critique decision sdd audit brand specs tracks backlog completeness cards. Prints OK/FAILED per file, exits 1 if anything failed.
+# Brainstorm phases, on a brainstorm folder (brainstorm.sh new): ground ideas novelty converge.
+# Appeal phases, on the open appeal of the case (appeal.sh): appeal (debate-arch and debate-pm positions) ruling.
 # status prints the state of each phase and the next one; vetoed lists who needs a rebuttal.
 # An approved decision splits the ADRs into adr/; an approved sdd generates style-tile.html, tokens.json and tokens.css;
 # an approved backlog exports backlog.csv, backlog.json and backlog-gh.sh; card-groups lists the groups of the cards phase,
@@ -13,7 +15,7 @@ shift 2
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 TOK="$SCRIPT_DIR/tokens.awk"
 . "$SCRIPT_DIR/gates.sh"
-PANEL="${*:-$(case_panel "$CASE_DIR")}"
+case "$PHASE" in ground|ideas|novelty|converge|appeal|ruling) PANEL="" ;; *) PANEL="${*:-$(case_panel "$CASE_DIR")}" ;; esac
 FAIL=0
 one() {
   r="$(check "$1" "$2" "$3")"
@@ -46,6 +48,16 @@ case "$PHASE" in
   brand) one brand debate-brand "$CASE_DIR/BRANDBOOK.md" ;;
   specs) "$SCRIPT_DIR/validate.sh" "$CASE_DIR" || FAIL=1 ;;
   vetoed) vetoed "$CASE_DIR"; echo ;;
+  ground) one ground debate-research "$CASE_DIR/ground.md" ;;
+  ideas)
+    [ -n "$(lenses_of "$CASE_DIR")" ] || { echo "FAILED ideas: no lens in meta.txt, run brainstorm.sh new"; exit 1; }
+    for l in $(lenses_of "$CASE_DIR"); do one ideas debate-ideator "$CASE_DIR/ideas/$l.md"; done ;;
+  novelty) one novelty debate-research "$CASE_DIR/novelty.md" ;;
+  converge) one converge debate-judge "$CASE_DIR/brainstorm.md" ;;
+  appeal|ruling)
+    A="$(open_appeal "$CASE_DIR")"; [ -n "$A" ] || { echo "FAILED $PHASE: no open appeal, run appeal.sh <case> <Bnn|ADR-NNNN> <evidence>"; exit 1; }
+    if [ "$PHASE" = "appeal" ]; then for a in debate-arch debate-pm; do one appeal "$a" "$A/$a.md"; done
+    else one ruling debate-judge "$A/ruling.md"; fi ;;
   status) exec "$SCRIPT_DIR/status.sh" "$CASE_DIR" ;;
   tracks) one track debate-ux "$CASE_DIR/backlog/design.md"; one track debate-arch "$CASE_DIR/backlog/eng.md" ;;
   backlog)
@@ -66,6 +78,6 @@ case "$PHASE" in
       merge_cards "$CASE_DIR"; "$SCRIPT_DIR/backlog-export.sh" "$CASE_DIR" > /dev/null
       printf 'BACKLOG-DETAILED.md: %s card(s)\n' "$(grep -c '^### B' "$CASE_DIR/BACKLOG-DETAILED.md")"
     fi ;;
-  *) echo "unknown phase: $PHASE (brief research agenda proposal critique decision sdd audit brand specs tracks backlog completeness card-groups cards vetoed status)" >&2; exit 2 ;;
+  *) echo "unknown phase: $PHASE (brief research agenda proposal critique decision sdd audit brand specs tracks backlog completeness card-groups cards vetoed status ground ideas novelty converge appeal ruling)" >&2; exit 2 ;;
 esac
 exit "$FAIL"

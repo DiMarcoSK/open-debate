@@ -4,6 +4,13 @@
 
 ### Added
 
+- `/opd-brainstorm`: from a rough theme to 3-5 proposals that fit the product, can be tested in 2 weeks and avoid the ideas every assistant gives, the picked one seeded as a debate case (`references/brainstorm.md`, research in `docs/brainstorm.md`). `brainstorm.sh new` draws lenses and stimuli from a seed outside the model (`references/lenses.conf`: far analogy always, plus 3 of inversion, outcome, enabler, business model and constraint). debate-research writes ground.md (the product's own files, real pains, market, shifts and a baseline of the obvious ideas). The new `debate-ideator` runs 1 blind call per lens, discards its own typical ideas first and anchors each idea to a Gn fact and a Bn it goes beyond. A scout checks each idea against what exists (novelty.md), and debate-judge `phase converge` scores novelty, fit, value and feasibility and names a wildcard and a pre-mortem. Gates: `gate.sh <dir> ground|ideas|novelty|converge`; a proposal built only from ideas that exist cannot score as novel. Headless: `brainstorm.sh run` (`MIX` puts each lens on another harness). `brainstorm.sh seed <dir> <Pn>` creates the debate case and fills the brief fields the proposal answers (goal, user, metric, hard constraint). The converge gate holds the pick to the top Total (or a written `override`) and the wildcard to feasibility 3+. A headless run writes raw/metrics.tsv and a `cost:` line. CLI: `open-debate brainstorm new|lenses|run|seed`.
+- After the debate, from the first `/opd-brainstorm` run on this repository:
+  - `verdict.sh` (phase 9b, `open-debate verdict`): VERDICT.md puts every ADR in force in 1 screen (chosen, over what, its accepted cost, the dissent still standing). `quiz` asks 1 question per ADR with its options shuffled and keeps the key in raw/quiz.key, and `check 1=a 2=b` grades and names only the ADRs to open. `receipt` writes RECEIPT.md for a client: what was chosen and why, its cost, what is not included and the delivery plan. `adr.awk` reads MADR at any heading level.
+  - `item.sh` (`open-debate item`): build/<Bnn>.md per item, with its line, dependencies with their status, card, the ADRs it follows (through any supersession), the spec tasks it cites with their user stories and EARS requirements, and the SDD sections it names. handoff.sh writes them and VERDICT.md, and the loop reads 1 file per item.
+  - `appeal.sh` (`open-debate appeal`): when an item fails twice or has to go against an ADR, debate-arch and debate-pm take a position and debate-judge rules (`phase ruling`): keep, amend or supersede. The gates `appeal` and `ruling` need an evidence excerpt found literally in the failing log. `apply` rewrites adr/, rebuilds build/ and appends the lesson to `lessons.md` next to the case. new-debate.sh copies that file into every new case, and the panel reads it in proposals and critiques.
+  - The brainstorm gives each lens its own pain from ground.md, turned by the seed, and the ideas gate needs 1 idea anchored on it: in the real run, the lenses had clustered on the loudest pain.
+- Command registry: `template/entry/commands.conf` lists the commands, each with `entry/<name>/` and `commands/<name>.md`. The installer, `ready in`, `doctor` and `harnesses` read it, so a new command installs in all 13 harnesses with no installer change.
 - Seats made for the idea. The agenda can add up to 2 seats (within the cap of 8) in a `## Specialists` table, each owning a contested decision: an optional catalog seat the brief words missed, or a specialist made for the case, `debate-x-<slug>`. A specialist gets `<case>/personas/<seat>.md` from `references/specialist-template.md` and has its `Must cover` terms checked in its proposal. In a session it runs as the new `debate-specialist` subagent; opencode headless calls also run it as `debate-specialist`, with the persona in the prompt. `panel.sh` prints how many seats the agenda may add, `gate.sh <case> agenda` seats them, and `--from agenda` archives the personas with the agenda.
 
 ### Changed
@@ -11,6 +18,13 @@
 - Fewer tokens from the command line. Each call gets its case files inside the prompt and answers in 1 turn instead of opening them one at a time (measured: 6 turns down to 1, -47% input on a proposal). `INLINE=0` turns it off. Headless Claude Code runs with only the read and search tools, no MCP servers and no skills (measured: -93% input per turn on a machine with MCP servers), when the installed version has the flags.
 - Headless Claude Code also runs with `--safe-mode` and reads the prompt on stdin. The user's hooks no longer run inside a call: a Stop hook asking for one more turn had replaced research.md with its reply. Without the 128 KiB argument cap, a call inlines up to 320 KB.
 - In a session, subagents open all their files in 1 turn, in parallel, and never twice.
+- Headless Claude Code writes its prompt cache with the 5-minute TTL (`FORCE_PROMPT_CACHING_5M=1`): a 1-turn call never reads its write back, and the 1-hour write costs 2x the input price, against 1.25x (US$ 1.94 less on the Sonnet run).
+- A run whose gates all pass but whose `validate` fails ends in `ABORT` with the reasons, not in `ok`.
+- Gemini and Qwen commands read `Arguments: {{args}}`.
+
+- The agenda line cap is 24, for the seat rows.
+- The delegation contract splits into general rules and the rules of each command: the /debate phase rules no longer reach /opd-brainstorm.
+- `refs_ok` checks ids against any source table (`ground.md` Gn and Bn as well as `research.md` Rn); the headless `OUTPUT` instruction lives in harness.sh, shared by debate.sh and brainstorm.sh.
 
 ### Fixed
 
@@ -18,7 +32,6 @@
 - An `[assumed]` without an owner fails the spec, decision, SDD, brand and backlog gates, so it gets a repair, instead of only failing `validate` after a run that reported ok.
 - A negation after a comma no longer seats anyone (`web app, no native app` seated debate-mobile).
 - `panel.sh --save` saves before printing, so `| head -1` does not lose the choice.
-- The agenda line cap is 24, for the seat rows.
 
 ## 0.6.0
 
