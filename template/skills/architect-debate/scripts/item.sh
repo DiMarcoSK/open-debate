@@ -67,7 +67,7 @@ for id in $ids; do
           for (i = 1; i <= k; i++) if (t >= lo[i] && t <= hi[i]) { print; break } }' "${d}tasks.md" > "$C/build/.tasks"
       cat "$C/build/.tasks"
       for u in $(grep -Eo '\[US[0-9]+\]' "$C/build/.tasks" | tr -d '[]' | sort -u); do
-        grep -E "^- $u[[:space:]]|\[$u\]" "${d}spec.md" 2>/dev/null || true
+        grep -E "^- ${u}[[:space:]]|\[${u}\]" "${d}spec.md" 2>/dev/null || true
       done
       rm -f "$C/build/.tasks"
     done
