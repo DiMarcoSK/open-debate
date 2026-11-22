@@ -18,7 +18,8 @@ tolower($0) ~ /^#+[[:space:]]*veto against/ {
   next
 }
 tolower($0) ~ /^[-*[:space:]]*quote[*[:space:]]*:/ {
-  l = $0; gsub(/“|”/, "\"", l)
+  # A model often escapes the quotes inside an excerpt (\"Check again\"): the backslash is not part of the text.
+  l = $0; gsub(/“|”/, "\"", l); gsub(/\\"/, "\"", l)
   a = index(l, "\""); r = substr(l, a + 1); b = 0
   for (i = length(r); i > 0; i--) if (substr(r, i, 1) == "\"") { b = i; break }
   if (a == 0 || b == 0) { print "FAIL quote without double quotes: " brief(l); fail = 1; n++; next }

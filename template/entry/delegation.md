@@ -1,5 +1,6 @@
 Delegation contract, every subagent call:
-- Prompt: `phase <x>. case: <absolute path>. reads: <files>. writes: <absolute file>. Write in English.` plus the phase line from SKILL.md. Pass paths, never paste file contents.
+- Prompt: `phase <x>. case: <absolute path>. reads: <files>. writes: <absolute file>. Write in English.` plus the phase line from SKILL.md. Pass paths, never paste file contents. The subagent opens every file of `reads:` in 1 turn, in parallel, and each once (debate-rules.md, Execution).
+- Case seat (`debate-x-<slug>`, seated by the agenda): call the subagent `debate-specialist` and add `seat: debate-x-<slug>. persona: <case>/personas/debate-x-<slug>.md.` to the prompt. `writes:`, gates and `vetoed` use the seat name; for `models.sh next` the agent is `debate-specialist`.
 - Independent calls go in the same turn so they run in parallel: the whole panel in one wave. If this harness runs subagents one at a time, send them in sequence and keep each one blind to the others' output.
 - In phases 2 and 3, name only the files in the SKILL.md `Reads` column. Never mention a rival's output to a panelist in phase 2, or another panelist's critique in phase 3.
 - Phase 5 goes only to the agents listed by `gate.sh <case> vetoed`.

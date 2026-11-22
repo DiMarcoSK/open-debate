@@ -7,7 +7,8 @@ cases/<slug>/
   idea.md  meta.txt  brief.md  constitution.md
   debate-rules.md  visual-contract.md  *-template.md
   research.md                  phase 1, debate-research
-  agenda.md                    phase 1b, debate-judge: contested decisions
+  agenda.md                    phase 1b, debate-judge: contested decisions and the seats it adds
+  personas/debate-x-<slug>.md  phase 1b, a specialist made for the case from specialist-template.md
   proposals/<agent>.md         phase 2
   critiques/<agent>.md         phase 3
   research-check.md            phase 4, fact-check
@@ -30,8 +31,8 @@ cases/<slug>/
 |---|---|
 | 0 intake | validate.sh: brief with no empty field |
 | 1 research | >= 5 distinct URLs, >= 5 Rn findings with a URL or `unverified`, Gaps section |
-| 1b agenda | 3-8 Dn decisions, 2+ options, owner on the panel, driver |
-| 2 proposal | concession, position on each Dn, existing Rn ids, line cap; arch: mermaid, ADR, capacity; ux: WCAG, heuristics, usability test, states, banned list, contrast without debate-brand; pm: MVP, metric, assumptions; design: flows, screen inventory, states, banned list; brand: contrast, banned list, voice, logo, platform; gcp and aws: cost, IAM, budget; k8s: cost, rollback; sec: STRIDE, authorization, audit; ai: eval, fallback, cost; data: pipeline, quality, retention, cost; mobile: offline, store, minimum version |
+| 1b agenda | 3-8 Dn decisions, 2+ options, owner on the panel or among the seats it adds, driver; up to 2 seats added within the cap of 8, each owning 1+ Dn: an optional catalog seat, or `debate-x-<slug>` with role, owns, why and 2+ Must cover terms |
+| 2 proposal | concession, position on each Dn, existing Rn ids, line cap; arch: mermaid, ADR, capacity; ux: WCAG, heuristics, usability test, states, banned list, contrast without debate-brand; pm: MVP, metric, assumptions; design: flows, screen inventory, states, banned list; brand: contrast, banned list, voice, logo, platform; gcp and aws: cost, IAM, budget; k8s: cost, rollback; sec: STRIDE, authorization, audit; ai: eval, fallback, cost; data: pipeline, quality, retention, cost; mobile: offline, store, minimum version; a case seat: every Must cover term of its persona |
 | 3 critique | 1-3 vetoes, none against self, quote found literally in the cited file, existing Rn ids, concession; ux with design on the panel: Review debate-design section |
 | 4 fact-check | does not block; a failure becomes a notice in research-check.md |
 | 5 rebuttal | only agents that took a veto; does not block; a failure falls back to the r1 proposal |
@@ -48,7 +49,8 @@ cases/<slug>/
 ## Limits
 
 - rounds 1-3 (1 = proposal only, 2 = +critique and fact-check, 3 = +rebuttal)
-- panel of 3-8 agents: debate-arch, debate-ux and debate-pm always; optional seats from the brief (references/panel.conf, `panel.sh`); judge, researcher and auditor sit outside the panel
+- panel of 3-8 agents: debate-arch, debate-ux and debate-pm always; optional seats from the brief (references/panel.conf, `panel.sh`); up to 2 more seated by the agenda (catalog or `debate-x-<slug>`, run by debate-specialist); judge, researcher and auditor sit outside the panel; `--from agenda` archives the case personas with the agenda
+- CLI calls get their case files inlined in the prompt (`INLINE=1`; up to 320 KB on Claude Code, which reads the prompt on stdin, 96 KB elsewhere; the rest the agent opens); Claude Code runs headless with only the read and search tools, no MCP servers, skills, hooks or CLAUDE.md (`--safe-mode`)
 - resume by default: an existing output is reused; `FRESH=1` redoes everything; `--from <phase>` archives that phase and the later ones in raw/archive and redoes them; `status` shows the next phase and warns when an output is older than its input
 - proposal and critique run in a room: a directory with only what the agent may read, no rival output
 - provider failed: automatic model fallback, the run fails only when no model is left. Session mode: `models.sh next <case> <agent>` gives the next model (models.conf `fallback`, spare, strong on a paid profile, the free catalog) for the subagent call; with none left, it continues with a panel >= 2. CLI: waits with backoff on a rate limit, then goes through `MODEL_FALLBACK` and the `MIX` harnesses; a route out of quota is skipped for the rest of the run

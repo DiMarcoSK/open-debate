@@ -37,6 +37,7 @@ Panel: `debate-arch`, `debate-ux` and `debate-pm` always sit. The optional seats
 | debate-gcp, debate-aws, debate-k8s | the cloud or cluster named |
 
 Adjust by what the brief means, not only by the word (ex: a product without screens drops `design`; an idea going public adds `brand`), save with `$S/panel.sh <case> --save <agents>` and state the panel in 1 line. Cap of 8 seats.
+Seats from the agenda: the judge, who has read the brief and the research, may add up to 2 seats (`panel.sh` prints `seats the agenda may add: K`) for a Dn no seat owns: an optional catalog seat the brief words missed, or a specialist made for this case, `debate-x-<slug>` (payments, clinical workflow, game economy, firmware...). Each owns 1+ Dn. An approved agenda writes the specialist's persona into `<case>/personas/` from `references/specialist-template.md` and saves the panel; a case seat runs as the subagent `debate-specialist`, with `seat: <name>. persona: <case>/personas/<name>.md.` in the prompt, and every file carries the seat's name.
 Design roles: debate-design decides what each screen holds (flows, inventory, wireframes, states); debate-ux reviews those screens in the critique (`## Review debate-design`) and owns usability, accessibility and the UI system; debate-brand creates the brand and TOKENS and, after the SDD, writes BRANDBOOK.md adapting the screens to the brand. Without debate-brand, TOKENS belongs to debate-ux.
 Options: `--panel design,brand` becomes `$S/panel.sh <case> --save design brand` (the base seats join on their own); `--rounds N` cuts phases (1 = proposal only, 2 = +critique and fact-check, 3 = +rebuttal); `--no-research` writes `research.md` with `skipped: ...`; `--no-factcheck` skips phase 4; `--no-audit` skips the SDD and backlog audits; `--no-cards` skips the cards.
 
@@ -45,7 +46,7 @@ Phases 1-6, each row is 1 wave of Tasks. `reads` and `writes` go in the Task pro
 | Phase | Subagent(s), in parallel | Reads | Writes | Gate |
 |---|---|---|---|---|
 | 1 research | debate-research (opens debate-scout per question) | brief.md, research-template.md | research.md | `gate.sh <case> research` |
-| 1b agenda | debate-judge, `phase agenda`, with the panel in the prompt | brief.md, constitution.md, research.md, agenda-template.md | agenda.md | `gate.sh <case> agenda`; then grill 2: the agenda decisions that depend on user preference (not on evidence) become up to 3 questions with a default; the answer goes into brief.md before the proposals |
+| 1b agenda | debate-judge, `phase agenda`, with the panel and the seats it may add in the prompt | brief.md, constitution.md, research.md, agenda-template.md | agenda.md | `gate.sh <case> agenda` (seats what the agenda adds and prints the panel); then grill 2: the agenda decisions that depend on user preference (not on evidence) become up to 3 questions with a default; the answer goes into brief.md before the proposals |
 | 2 proposal | whole panel | brief.md, constitution.md, research.md, agenda.md, debate-rules.md, visual-contract.md (design, ux, brand) | proposals/<agent>.md | `gate.sh <case> proposal` |
 | 3 critique | whole panel | brief.md, research.md, agenda.md, debate-rules.md, rival proposals | critiques/<agent>.md | `gate.sh <case> critique` |
 | 4 fact-check | debate-research, `phase fact-check` | proposals/, critiques/, research-template.md | research-check.md | does not block |
@@ -56,7 +57,7 @@ Phases 1-6, each row is 1 wave of Tasks. `reads` and `writes` go in the Task pro
 | 6d brand (only with debate-brand) | debate-brand, `phase brand` | brief.md, SDD.md, decision.md, proposals/debate-brand(-r2).md, proposals/debate-design.md, critiques/debate-ux.md, brandbook-template.md, visual-contract.md | BRANDBOOK.md | `gate.sh <case> brand` |
 
 Failed gate: 1 repair Task to the same agent with `FIX: <gate reason>`; fails again, stop and report. A provider failure (quota, usage limit, persistent 429) is not a gate failure: follow the model fallback of the delegation contract (`$S/models.sh next <case> <agent>` in opencode) and stop only when no model is left. An existing case resumes: `$S/gate.sh <case> status` shows each phase, the next one and stale outputs.
-In phases 2 and 3, the Task prompt names only the files in the Reads column: an agent that does not get a rival's path stays blind.
+In phases 2 and 3, the Task prompt names only the files in the Reads column: an agent that does not get a rival's path stays blind. A case seat reads its persona file too.
 
 Phase 7, specs: `$S/make-specs.sh <case> <slugs from the decision.md index>`; 1 Task per spec in parallel (debate-arch, `phase spec`, with the spec's index line from decision.md as its scope in the prompt; reads brief.md, SDD.md, adr/, visual-contract.md and the 3 templates, not decision.md; for spec/plan/tasks; debate-design, or debate-ux without design on the panel, fills spec section 6 when there is UI), then `$S/gate.sh <case> specs`, repair at the source until zero.
 
@@ -103,7 +104,8 @@ $S/gate.sh <case> status          # where it stopped, next phase, stale outputs,
 FROM=critique HARNESS=<id> $S/debate.sh <case>   # archives critique onward and redoes it
 ```
 
-Env: `HARNESS`, `MODEL` (empty = harness default), `MODEL_FALLBACK` (list tried in order when a model runs out of quota: `model`, `harness:model` or `harness:`; then the `MIX` harnesses; fails only with none left), `MIX`, `ROUTES` (`debate-arch=claude debate-ux=codex:<model>`), `HARNESS_CMD` (with `HARNESS=custom`), `RETRIES=2`, `TIMEOUT=600` s per call, `BACKOFF=20` s, `PARALLEL=6`, `MAX_CALLS=0` (no cap), `MIN_LINES=5`, `PANEL` (empty = meta.txt or the brief; the base always joins), `FROM`, `RESEARCH=1`, `AGENDA=1`, `FACTCHECK=1`, `SPECS=1`, `REVIEW=1` (SDD and backlog audits), `CARDS=1`, `REPAIR=1`, `FRESH=0`, `OVERWRITE=0`.
+Env: `HARNESS`, `MODEL` (empty = harness default), `MODEL_FALLBACK` (list tried in order when a model runs out of quota: `model`, `harness:model` or `harness:`; then the `MIX` harnesses; fails only with none left), `MIX`, `ROUTES` (`debate-arch=claude debate-ux=codex:<model>`), `HARNESS_CMD` (with `HARNESS=custom`), `RETRIES=2`, `TIMEOUT=600` s per call, `BACKOFF=20` s, `PARALLEL=6`, `MAX_CALLS=0` (no cap), `MIN_LINES=5`, `PANEL` (empty = meta.txt or the brief; the base always joins), `FROM`, `RESEARCH=1`, `AGENDA=1`, `FACTCHECK=1`, `SPECS=1`, `REVIEW=1` (SDD and backlog audits), `CARDS=1`, `REPAIR=1`, `FRESH=0`, `OVERWRITE=0`, `INLINE=1` (the case files of a call go inside its prompt, so the agent spends no turn opening them; 0 = it opens them itself).
+In the CLI the agenda seats its seats the same way; the panel line of summary.log names each one.
 
 ## Models
 

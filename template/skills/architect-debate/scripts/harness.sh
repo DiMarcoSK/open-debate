@@ -14,12 +14,33 @@ h_binary() {
 h_exists() {
   b="$(h_binary "$1")" || { echo "error: unknown harness: $1" >&2; return 2; }
   command -v "$b" >/dev/null 2>&1 || { echo "error: $b not found on PATH" >&2; return 2; }
+  # A headless Claude Code call loads the user's MCP servers, skills, hooks, CLAUDE.md and every built-in tool definition,
+  # and resends them on every turn. The panel only reads and searches: these flags leave just those tools. --safe-mode
+  # also keeps the user's hooks out: a Stop hook that asks for one more turn replaces the answer with its reply.
+  # A version without a flag keeps the call without it.
+  if [ "$1" = "claude" ] && [ -z "${H_CLAUDE_FLAGS+x}" ]; then
+    H_CLAUDE_FLAGS=""; hh="$(claude --help < /dev/null 2>/dev/null || true)"
+    case "$hh" in *--tools*) case "$hh" in *--strict-mcp-config*) case "$hh" in *--disable-slash-commands*)
+      H_CLAUDE_FLAGS="--tools Read,Glob,Grep,WebSearch,WebFetch --strict-mcp-config --disable-slash-commands" ;; esac ;; esac ;; esac
+    case "$hh" in *--safe-mode*) H_CLAUDE_FLAGS="$H_CLAUDE_FLAGS --safe-mode" ;; esac
+  fi
   if [ "$1" = "custom" ] && [ -z "${HARNESS_CMD:-}" ]; then echo "error: HARNESS=custom needs HARNESS_CMD" >&2; return 2; fi
 }
 
-persona() { awk 'c >= 2 { print } /^---$/ { c++ }' "$SCRIPT_DIR/../personas/$1.md"; }
+# persona <agent>: the persona body. A case seat (debate-x-<slug>, made by the agenda) lives in the case, in $OUT/personas.
+persona() {
+  case "$1" in debate-x-*) pf="${OUT:-.}/personas/$1.md" ;; *) pf="$SCRIPT_DIR/../personas/$1.md" ;; esac
+  awk 'c >= 2 { print } /^---$/ { c++ }' "$pf"
+}
 
-h_prompt() { printf '%s\n\n## Task\n\n%s\n' "$(persona "$1")" "$2"; }
+# h_prompt <agent> <task> [context]: persona, the inlined case files, then the task, last, where the model reads it best.
+h_prompt() { printf '%s\n\n%s## Task\n\n%s\n' "$(persona "$1")" "${3:+$3
+
+}" "$2"; }
+
+# h_inline_max <harness>: how many bytes of case files fit in its prompt. An argument is capped at 128 KiB on Linux
+# (persona and task included); a harness that reads the prompt on stdin has no such cap, only the model's context.
+h_inline_max() { case "$1" in claude) printf 320000 ;; *) printf 96000 ;; esac; }
 
 # h_call: the call itself. stdin closed, because several CLIs wait for piped input and hang.
 h_call() {
@@ -32,8 +53,11 @@ h_call() {
         exec $TO opencode run --print-logs --log-level ERROR "$@" "$ta" ;;
       claude)
         set -- --output-format json --allowedTools "Read,Glob,Grep,WebSearch,WebFetch"
+        # shellcheck disable=SC2086
+        set -- "$@" ${H_CLAUDE_FLAGS:-}
         [ -z "$mo" ] || set -- "$@" --model "$mo"
-        exec $TO claude -p "$ta" "$@" ;;
+        # The prompt goes on stdin: an argument is capped at 128 KiB on Linux, and the inlined case files can pass that.
+        printf '%s' "$ta" | exec $TO claude -p "$@" ;;
       codex)
         set -- --skip-git-repo-check --sandbox read-only -c web_search=live -o "$ra.fim"
         [ -z "$mo" ] || set -- "$@" -m "$mo"
@@ -81,12 +105,19 @@ h_call() {
   ) < /dev/null > "$ra" 2> "$ra.stderr"
 }
 
-# h_run <harness> <agent> <task> <model> <dir> <raw-output>; stderr goes to <raw-output>.stderr
+# h_run <harness> <agent> <task> <model> <dir> <raw-output> [context]; stderr goes to <raw-output>.stderr
+# opencode runs its installed agent, which holds the persona; a case seat runs as debate-specialist with its persona in the prompt.
 # The call lives in its own function: in dash, redirecting a group around the subshell drops the inner redirections.
 # The 2>/dev/null here silences the shell notice when the TIMEOUT alarm kills the call.
 h_run() {
-  h="$1"; ag="$2"; ta="$3"; mo="$4"; di="$5"; ra="$6"
-  [ "$h" = "opencode" ] || ta="$(h_prompt "$ag" "$ta")"
+  h="$1"; ag="$2"; ta="$3"; mo="$4"; di="$5"; ra="$6"; cx="${7:-}"
+  if [ "$h" != "opencode" ]; then ta="$(h_prompt "$ag" "$ta" "$cx")"
+  else
+    case "$ag" in
+      debate-x-*) ta="$(h_prompt "$ag" "$ta" "$cx")"; ag=debate-specialist ;;
+      *) [ -z "$cx" ] || ta="$(printf '%s\n\n## Task\n\n%s' "$cx" "$ta")" ;;
+    esac
+  fi
   h_call 2>/dev/null
 }
 

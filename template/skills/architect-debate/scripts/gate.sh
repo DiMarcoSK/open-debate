@@ -23,7 +23,17 @@ one() {
 case "$PHASE" in
   brief) "$SCRIPT_DIR/validate.sh" "$CASE_DIR" --brief || FAIL=1 ;;
   research) one research debate-research "$CASE_DIR/research.md" ;;
-  agenda) one agenda debate-judge "$CASE_DIR/agenda.md" ;;
+  agenda)
+    one agenda debate-judge "$CASE_DIR/agenda.md"
+    # An approved agenda seats what it adds: the persona of each case seat is written into personas/, the panel saved.
+    if [ "$FAIL" -eq 0 ] && [ -n "$(agenda_seats "$CASE_DIR")" ]; then
+      spawn_seats "$CASE_DIR"; PANEL="$(with_seats "$CASE_DIR" "$PANEL")"; save_panel "$CASE_DIR" "$PANEL"
+      printf 'panel: %s\n' "$PANEL"
+      for a in $(agenda_seats "$CASE_DIR"); do
+        if case_seat "$a"; then printf '  %s: case seat, run it as debate-specialist with persona: %s\n' "$a" "$(persona_of "$CASE_DIR" "$a")"
+        else printf '  %s: catalog seat, seated by the agenda\n' "$a"; fi
+      done
+    fi ;;
   proposal) for a in $PANEL; do one proposal "$a" "$CASE_DIR/proposals/$a.md"; done ;;
   critique) for a in $PANEL; do one critique "$a" "$CASE_DIR/critiques/$a.md"; done ;;
   decision)

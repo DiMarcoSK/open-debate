@@ -13,12 +13,14 @@ PANEL_CAP=8
 AWKS="${TOK%/*}"
 CATALOG="$AWKS/../references/panel.conf"
 
-# What the brief actually states: values without labels, without the Out of scope line and without negations;
+# What the brief actually states: values without labels, without the Out of scope line and without negations, at the
+# start of a value or after a comma ("web app, no native app");
 # lowercase and without accents. The brief may be in any language, so negations cover English and Portuguese.
 brief_text() {
   { sed -n '/^- Out of scope/d; /^- Fora do escopo/d; s/^- [^:]*:[[:space:]]*//p' "$1/brief.md" 2>/dev/null; sed 1d "$1/idea.md" 2>/dev/null; } \
     | if perl -MUnicode::Normalize -e 1 2>/dev/null; then perl -CSD -MUnicode::Normalize -ne '$_ = lc NFD($_); s/\pM//g; print'
       else tr '[:upper:]' '[:lower:]'; fi \
+    | sed -E 's/(^|[,;(])[[:space:]]*(no|none|not|without|nao|nenhum|nenhuma|sem)[[:space:]][^,;.)]*//g' \
     | grep -Ev '^[[:space:]]*(no|none|not|without|n/a|nao|nenhum|nenhuma|sem)([^a-z]|$)' || true
 }
 
@@ -49,11 +51,57 @@ with_base() { cap_panel "$PANEL_BASE $1"; }
 
 pick_panel() { with_base "$(panel_reasons "$1" | cut -d: -f1 | tr '\n' ' ')"; }
 
-# case_panel <case>: the panel saved in meta.txt or, without it, the one picked by the brief.
+# --- seats the agenda adds: the judge reads the brief and the research, so it sees a need the keyword triggers miss.
+# A row of the agenda `## Specialists` table names a catalog seat (debate-ai) or a case seat (debate-x-<slug>), a specialist
+# made for this case from references/specialist-template.md into <case>/personas/. Every seat added owns 1+ Dn.
+SPECIALIST_CAP=2
+case_seat() { case "$1" in debate-x-*) return 0 ;; esac; return 1; }
+no_case_seats() { for x in $1; do case_seat "$x" || printf '%s ' "$x"; done; }
+# seat_rows <agenda>: the seat rows, 1 line "seat<TAB>role<TAB>owns<TAB>must cover<TAB>why" each; a cell of "-" is empty.
+seat_rows() {
+  [ -s "$1" ] || return 0
+  awk -F'|' '/^\|[ *`]*debate-[a-z0-9-]+[ *`]*\|/ { o = ""
+    for (i = 2; i <= 6; i++) { x = $i; gsub(/^[ *`]+|[ *`]+$/, "", x); if (x == "-") x = ""; o = o (i > 2 ? "\t" : "") x }
+    print o }' "$1"
+}
+agenda_seats() { seat_rows "$1/agenda.md" | cut -f1 | tr '\n' ' '; }
+# with_seats <case> <panel>: the panel plus the seats its agenda adds.
+with_seats() { cap_panel "$(no_case_seats "$2") $(agenda_seats "$1")"; }
+# seat_slots <panel> [agenda]: how many seats the agenda may add, without the seats that agenda itself names.
+seat_slots() {
+  ss_n=0; ss_r=" $(seat_rows "${2:-}" | cut -f1 | tr '\n' ' ') "
+  for x in $(no_case_seats "$1"); do case "$ss_r" in *" $x "*) ;; *) ss_n=$((ss_n + 1)) ;; esac; done
+  ss_k=$((PANEL_CAP - ss_n)); [ "$ss_k" -le "$SPECIALIST_CAP" ] || ss_k="$SPECIALIST_CAP"; [ "$ss_k" -ge 0 ] || ss_k=0
+  printf '%s' "$ss_k"
+}
+# persona_of <case> <agent>: the persona file of a seat, the case's own for a case seat.
+persona_of() { if case_seat "$2"; then printf '%s/personas/%s.md' "$1" "$2"; else printf '%s/../personas/%s.md' "$AWKS" "$2"; fi; }
+
+# spawn_seats <case>: writes the persona of every case seat of the agenda that does not have one yet (an edited persona stays).
+spawn_seats() {
+  seat_rows "$1/agenda.md" | while IFS="$(printf '\t')" read -r s role owns cover why; do
+    case_seat "$s" || continue
+    p="$1/personas/$s.md"; [ -s "$p" ] && continue
+    mkdir -p "$1/personas"
+    dns="$(awk -F'|' -v s="$s" '/^\|[ *]*D[0-9]+[ *]*\|/ { id = $2; o = $5; gsub(/[ *`]/, "", id); gsub(/[ *`]/, "", o); if (o == s) r = r (r == "" ? "" : ", ") id } END { print r }' "$1/agenda.md")"
+    SEAT="$s" ROLE="$role" OWNS="$owns" COVER="$cover" WHY="$why" DNS="$dns" awk '
+      { for (k = split("SEAT ROLE OWNS COVER WHY DNS", v, " "); k > 0; k--) { t = "@" v[k] "@"
+          while ((i = index($0, t)) > 0) $0 = substr($0, 1, i - 1) ENVIRON[v[k]] substr($0, i + length(t)) }
+        print }' "$AWKS/../references/specialist-template.md" > "$p"
+  done
+}
+
+# save_panel <case> <panel>: the `panel:` line of meta.txt.
+save_panel() {
+  { grep -v '^panel:' "$1/meta.txt" 2>/dev/null || true; printf 'panel: %s\n' "$2"; } > "$1/meta.txt.tmp"
+  mv "$1/meta.txt.tmp" "$1/meta.txt"
+}
+
+# case_panel <case>: the panel saved in meta.txt or, without it, the one picked by the brief; plus the agenda's seats.
 case_panel() {
   pc="$(sed -n 's/^panel: //p' "$1/meta.txt" 2>/dev/null | tail -1)"
   [ -n "$pc" ] || pc="$(pick_panel "$1")"
-  printf '%s' "$pc"
+  with_seats "$1" "$pc"
 }
 skipped() { grep -q '^skipped' "$1" 2>/dev/null; }
 # legacy_case <case>: created before 0.5, with Portuguese templates and headings that the English gates do not read.
@@ -78,7 +126,7 @@ line_cap() {
     proposal:*) printf 55 ;;
     critique:*) printf 25 ;;
     research:*) printf 100 ;;
-    agenda:*) printf 20 ;;
+    agenda:*) printf 24 ;;
     decision:*) printf 150 ;;
     audit:*) printf 25 ;;
     completeness:*) printf 45 ;;
@@ -150,6 +198,12 @@ vetoed() {
   done
 }
 
+# assumed_ok <file...>: an `[assumed]` needs an owner, or nobody validates it. A quoted `[assumed]` only talks about it.
+assumed_ok() {
+  ao="$(grep -Hn '\[assumed' "$@" 2>/dev/null | grep -vi 'owner' | grep -v '`\[assumed' | head -3 | sed 's/^\([^:]*:[0-9]*\):.*/\1/; s#.*/##' | tr '\n' ' ')"
+  [ -z "$ao" ] || printf '; [assumed] without an owner at %swrite [assumed, owner <name>, <week>]' "$ao"
+}
+
 check_spec() {
   d="${1%/}"; c="${d%/*}"; c="$(parent "$c")"; m=""
   for x in spec plan tasks; do
@@ -164,6 +218,7 @@ check_spec() {
     done
   fi
   grep -q 'THE SYSTEM SHALL' "$d/spec.md" || m="$m; no EARS requirement (THE SYSTEM SHALL)"
+  m="$m$(cd "$d" && assumed_ok spec.md plan.md tasks.md)"
   grep -Eq '^- \[.\] T[0-9]+' "$d/tasks.md" || m="$m; tasks without a - [ ] Tnnn line"
   for u in $(sed -n 's/^- \(US[0-9][0-9]*\)[[:space:]].*/\1/p' "$d/spec.md"); do
     grep -q "\[$u\]" "$d/tasks.md" || m="$m; $u has no task"
@@ -180,6 +235,7 @@ check() {
     *) c="$(parent "$f")" ;;
   esac
   m="$(size_ok "$phase" "$a" "$f")"
+  case "$phase" in decision|sdd|brand|backlog) m="$m$(assumed_ok "$f")" ;; esac
   case "$phase" in
     research)
       if skipped "$f"; then return 0; fi
@@ -194,14 +250,27 @@ check() {
       if skipped "$f"; then return 0; fi
       n="$(grep -cE '^\|[ *]*D[0-9]+[ *]*\|' "$f" || true)"
       { [ "$n" -ge 3 ] && [ "$n" -le 8 ]; } || m="$m; $n decision(s), expected 3-8 rows | Dn | ..."
-      r="$(awk -F'|' -v panel=" $PANEL " '
+      r="$(awk -F'|' -v panel=" $(no_case_seats "$PANEL") $(seat_rows "$f" | cut -f1 | tr '\n' ' ') " '
         /^\|[ *]*D[0-9]+[ *]*\|/ {
           id = $2; o = $4; owner = $5; drv = $6; gsub(/[ *]/, "", id); gsub(/[ *`]/, "", owner); gsub(/ /, "", drv)
           if (o !~ / \/ /) print id " without 2+ options separated by / "
           if (index(panel, " " owner " ") == 0) print id " with an owner outside the panel: " owner
           if (drv == "") print id " without a driver"
         }' "$f")"
-      [ -z "$r" ] || m="$m; $(printf '%s' "$r" | tr '\n' ';' | sed 's/;/; /g')" ;;
+      [ -z "$r" ] || m="$m; $(printf '%s' "$r" | tr '\n' ';' | sed 's/;/; /g')"
+      r="$(seat_rows "$f" | awk -F'\t' -v slots="$(seat_slots "$PANEL" "$f")" -v cat="$CATALOG" -v ag="$f" '
+        BEGIN { while ((getline l < cat) > 0) { split(l, x, "|"); if (x[2] == "optional") opt[x[1]] = 1 }
+                while ((getline l < ag) > 0) if (match(l, /^\|[ *]*D[0-9]+[ *]*\|/)) { split(l, x, "|"); o = x[5]; gsub(/[ *`]/, "", o); own[o] = 1 } }
+        { n++; s = $1
+          if (s in seen) { print s " seated twice"; next }; seen[s] = 1
+          if (!(s in own)) print s " owns no Dn: a seat that decides nothing only costs calls"
+          if (s ~ /^debate-x-/) {
+            if (s !~ /^debate-x-[a-z0-9]+(-[a-z0-9]+)*$/ || length(s) > 32) print s " is not a seat name debate-x-<slug>"
+            if ($2 == "" || $3 == "" || $5 == "") print s " without Role, Owns or Why"
+            if (split($4, c, ",") < 2) print s " with fewer than 2 Must cover terms, separated by commas"
+          } else if (!(s in opt)) print s " is neither a debate-x-<slug> seat nor an optional seat of panel.conf" }
+        END { if (n > slots) print n " seat(s) added, " slots " free (cap " '"$SPECIALIST_CAP"' ", panel up to '"$PANEL_CAP"')" }')"
+      [ -z "$r" ] || m="$m; $(printf '%s' "$r" | tr '\n' ';' | sed 's/;$//; s/;/; /g')" ;;
     proposal)
       has "$f" 'concession' || m="$m; no concession"
       for d in $(missing_d "$c" "$f"); do m="$m; no position on $d"; done
@@ -257,6 +326,12 @@ check() {
           has "$f" 'stride' || m="$m; no STRIDE"
           has "$f" 'authz\|authoriz' || m="$m; no authorization model"
           has "$f" 'audit' || m="$m; no audit trail" ;;
+        debate-x-*)
+          # The terms the judge asked of this seat, from the `Must cover:` line of its persona.
+          for t in $(sed -n 's/^Must cover: //p' "$(persona_of "$c" "$a")" 2>/dev/null | sed 's/\.$//; s/, */,/g; s/ /_/g; s/,/ /g'); do
+            t="$(printf '%s' "$t" | tr _ ' ')"
+            grep -qiF -- "$t" "$f" || m="$m; does not cover $t"
+          done ;;
       esac ;;
     critique)
       n="$(grep -cEi '^#+[[:space:]]*veto against' "$f" || true)"

@@ -13,7 +13,7 @@ template/
   entry/          orchestrator for the other harnesses, per mode
   skills/architect-debate/
     SKILL.md      session mode protocol
-    personas/     specialists, the canonical source
+    personas/     specialists, the canonical source (debate-specialist takes the seats the agenda makes, from references/specialist-template.md)
     references/   templates and rules copied into each case
     scripts/      gates and CLI mode; harness.sh is the headless adapter, status.sh reads a case
 test/             suite, fixtures and fake CLIs
@@ -45,6 +45,8 @@ docs/harnesses.md harness matrix and the evidence for each
 Agents and `gates.sh` are a contract: gates read words and formats from the templates (`Concessao`, `### Veto contra`, `Dn:`, `Capacidade:`, the `Total` column). When changing a template, update the gate, the fixture and the agent together. `citacoes.awk`, `placar.awk` and `backlog.awk` redo what agents claim; a new claim that can be recomputed belongs there.
 
 ## Adding a specialist
+
+A domain that only some ideas need (payments, clinical workflow, game economy) does not need a catalog seat: the judge makes a case seat for it in the agenda, from `references/specialist-template.md`. Add a catalog seat only for a domain that comes up often and needs its own role checks.
 
 1. Add `personas/debate-<x>.md` with the same frontmatter. State what it owns, what it does not own, its method and its proposal format, with `Posicoes` first.
 2. Add its line to `models.conf`, to `references/panel.conf` (`base` or `optional` with its trigger words), and to the specialist list in `template/entry/subagents.md`.

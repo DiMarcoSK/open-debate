@@ -3,7 +3,7 @@
 open-debate has 2 sides, and each harness connects to them in its own way.
 
 - **Installation:** `open-debate init` translates the canonical personas into the harness's native format.
-- **Headless execution:** `open-debate run` calls the harness as a process, with the persona inside the prompt. It does not depend on the installation.
+- **Headless execution:** `open-debate run` calls the harness as a process, with the persona and the case files it reads inside the prompt. It does not depend on the installation. Claude Code gets the prompt on stdin and runs with `--tools Read,Glob,Grep,WebSearch,WebFetch --strict-mcp-config --disable-slash-commands --safe-mode` when its `--help` lists them, so the user's MCP servers, skills, hooks and CLAUDE.md stay out of every turn.
 
 ## Modes
 
@@ -22,7 +22,7 @@ Orchestration always stays in the main session, because on several harnesses a s
 | ID | Harness | Skills (user) | Agents (user) | Invocation | Headless | Evidence |
 |---|---|---|---|---|---|---|
 | `opencode` | opencode | `~/.config/opencode/skills` | `~/.config/opencode/agents` | `/debate` | `opencode run --format json` | installation tested; headless needs a paid model |
-| `claude` | Claude Code | `~/.claude/skills` | `~/.claude/agents` | `/debate` | `claude -p --output-format json` | tested for real, including a reduced debate |
+| `claude` | Claude Code | `~/.claude/skills` | `~/.claude/agents` | `/debate` | `claude -p --output-format json --tools ... --strict-mcp-config` | tested for real, including a reduced debate |
 | `omp` | oh-my-pi | `~/.omp/agent/skills` | `~/.omp/agent/agents` | `/skill:debate` | `omp -p --no-session` | tested for real |
 | `codex` | Codex CLI | `~/.agents/skills` | `~/.codex/agents/*.toml` | `$debate` | `codex exec -o <file>` | docs |
 | `cursor` | Cursor | `~/.cursor/skills` | `~/.cursor/agents` | `/debate` | `cursor-agent -p --output-format json` | docs |

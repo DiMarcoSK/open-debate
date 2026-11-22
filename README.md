@@ -130,7 +130,7 @@ open-debate status "$case"              # each phase, the next one, stale output
 open-debate run "$case" --from critique # archives that phase and the later ones in raw/archive, then redoes them
 ```
 
-`raw/metrics.tsv` records time, attempts, outcome and tokens per call, and `status` shows the share of tokens per phase, so you can see which phase is worth cutting. See [efficiency](docs/efficiency.md). `Ctrl-C` ends the calls in flight, and a second run on the same case is refused.
+From the command line, each call gets its case files in the prompt, so the agent spends no turn opening them, and Claude Code runs headless with only the read and search tools. `raw/metrics.tsv` records time, attempts, outcome and tokens per call, and `status` shows the share of tokens per phase, so you can see which phase is worth cutting. See [efficiency](docs/efficiency.md). `Ctrl-C` ends the calls in flight, and a second run on the same case is refused.
 
 ### When a model runs out
 
@@ -194,7 +194,7 @@ flowchart TD
 |---|---|---|
 | 0 intake | orchestrator | no empty brief field |
 | 1 research | `debate-research`, `debate-scout` | 5+ distinct URLs, 5+ findings with a source, gaps section |
-| 1b agenda | `debate-judge` | 3-8 decisions, 2+ options, owner on the panel, deciding driver |
+| 1b agenda | `debate-judge` | 3-8 decisions, 2+ options, owner on the panel, deciding driver; up to 2 seats added, each owning a decision |
 | 2 proposal | panel | position on every agenda item, concession, only existing finding ids, length; plus role checks (C4, contrast, cost and IAM, rollback, STRIDE) |
 | 3 critique | panel | 1-3 vetoes, none against itself, quote found in the cited file, concession |
 | 4 fact-check | `debate-research` | non-blocking |
@@ -226,6 +226,8 @@ Details in [`protocol.md`](template/skills/architect-debate/references/protocol.
 | `debate-gcp`, `debate-aws`, `debate-k8s` | that cloud or a cluster |
 
 `open-debate panel <case>` shows the panel the brief triggers and the word that triggered each seat; `--save design,brand` records a choice. `--panel design,brand` on `run` picks the seats by hand, and the base seats are added anyway. Triggers live in [`panel.conf`](template/skills/architect-debate/references/panel.conf), in English and Portuguese; the "Out of scope" line and negative answers ("none", "no", "nenhum") never trigger a seat. For another cloud, create a persona modeled on `debate-aws.md` and add it there.
+
+**Seats made for the idea.** Keywords only go so far. After research, the judge sees which contested decisions no seat is equipped to argue, and can add up to 2 seats in the agenda (within the cap of 8), each one the owner of such a decision. A seat is either an optional seat from the catalog that the brief's words missed, or a specialist made for the case: `debate-x-payments`, `debate-x-clinical`, `debate-x-game-economy`. A specialist gets a persona in `<case>/personas/`, built from [`specialist-template.md`](template/skills/architect-debate/references/specialist-template.md) with its role, what it owns and the terms its proposal must cover, which its gate then checks. It proposes, critiques and rebuts like any other seat. In a session it runs as the `debate-specialist` subagent, which reads that persona. Edit the persona before the proposals to adjust it, and run with `--from agenda` to redo the seats.
 
 **Principles.** `constitution.md` is copied into each case, and the intake can adjust it. Breaking a principle requires a written override.
 

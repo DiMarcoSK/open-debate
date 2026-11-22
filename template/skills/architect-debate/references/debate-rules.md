@@ -34,4 +34,5 @@ Close with `## Concession` (1 line: the agent and where they are right). Without
 ## Execution
 - Task with `writes: <file>`: write the full text to that file (and only to it) and reply only `OK <file> <n lines>`, or `FAIL <reason>`. Without `writes:`: reply with the full text.
 - Relative paths are relative to `case:`.
+- Read once, in 1 turn: open every file you need in the same turn, in parallel, and never open a file twice. Every extra turn resends everything read so far. Files inlined in the prompt (`## Case files`) are already read: do not open them. Open nothing outside your task.
 - A fact research.md does not cover: up to 2 Tasks to `debate-scout` in the same turn, 1 question each, and cite the URL it returns. Do not delegate opinion.

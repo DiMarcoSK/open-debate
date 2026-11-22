@@ -2,7 +2,8 @@
 # opencode stub for the tests: no network and no LLM. `run` returns the phase fixture in opencode's JSON.
 set -eu
 FX="$(CDPATH= cd -- "$(dirname -- "$0")/../fixtures" && pwd)"
-[ -z "${STUB_LOG:-}" ] || printf '%s\n' "$*" >> "$STUB_LOG"
+# 1 line per call: an inlined prompt has many.
+[ -z "${STUB_LOG:-}" ] || printf '%s\n' "$(printf '%s' "$*" | tr '\n' ' ')" >> "$STUB_LOG"
 
 if [ "${1:-}" = "models" ]; then
   printf 'opencode/free-a\n{"id":"free-a","providerID":"opencode","status":"active","cost":{"input":0,"output":0},"capabilities":{"toolcall":true}}\n'
@@ -25,11 +26,13 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
+# With inlined case files, the task comes after the last "## Task".
+case "$task" in *"## Task"*) task="$(printf '%s\n' "$task" | awk '/^## Task/ { t = ""; on = 1; next } on && t == "" && NF { t = $0 } END { print t }')" ;; esac
 short="${agent#debate-}"
 case "$task" in
   "phase research"*) f=research.md ;;
   "phase fact-check"*) f=research-check.md ;;
-  "phase agenda"*) f=agenda.md ;;
+  "phase agenda"*) f="${STUB_AGENDA:-agenda.md}" ;;
   "phase proposal"*) f="proposal-$short.md" ;;
   "phase critique"*) f=critique.md; [ "$short" = "ux" ] && f=critique-ux.md ;;
   "phase rebuttal"*) f=rebuttal.md ;;
@@ -52,6 +55,6 @@ if [ "${FAIL_ONCE:-}" = "$f" ] && [ ! -e "$STUB_STATE.$f" ]; then
   printf 'nothing useful\nline\nline\nline\nline\nline\n' | jq -Rs '{type:"text",part:{text:.}}' -c
   exit 0
 fi
-rival="$(printf '%s' "$task" | grep -Eo 'proposals/debate-[a-z0-9]+' | head -1 | sed 's#proposals/##')"
+rival="$(printf '%s' "$task" | grep -Eo 'proposals/debate-[a-z0-9-]+' | head -1 | sed 's#proposals/##')"
 if [ "$f" = "critique.md" ] || [ "$f" = "critique-ux.md" ]; then sed "s/debate-gcp/$rival/g" "$FX/$f"; else cat "$FX/$f"; fi | jq -Rs '{type:"text",part:{text:.}}' -c
 echo '{"type":"step_finish","part":{"tokens":{"input":900,"output":100,"reasoning":0,"cache":{"read":0,"write":0}}}}'

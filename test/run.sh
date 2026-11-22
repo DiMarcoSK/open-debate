@@ -309,6 +309,11 @@ citacao_folgada() {
   c="$(caso_completo)"
   sed -e 's/debate-gcp/debate-k8s/g' -e 's/"D1: option A because it costs less"/"  d1:   **OPTION A** ... costs less"/' "$FX/critique.md" > "$c/critiques/debate-arch.md"
   "$CLI" gate "$c" critique debate-arch
+  # Inner quotes escaped by the model (\"...\") still match the text.
+  echo 'Loading: then falls back to "Check again".' >> "$c/proposals/debate-k8s.md"
+  sed -e 's/debate-gcp/debate-k8s/g' -e 's/"D1: option A because it costs less"/"then falls back to \\"Check again\\""/' "$FX/critique.md" > "$c/critiques/debate-arch.md"
+  grep -q 'to \\"Check' "$c/critiques/debate-arch.md"
+  "$CLI" gate "$c" critique debate-arch
 }
 veto_contra_si() {
   c="$(caso_completo)"
@@ -452,12 +457,15 @@ spec_ruim() {
   sed 's/ADR-0001/ADR-0042/' "$FX/spec.md" > "$d/spec.md"
   nao "$CLI" validate "$c" > "$WORK/g" 2>&1
   grep -q 'ADR-0042, which does not exist' "$WORK/g"
+  { cat "$FX/spec.md"; echo '- Deadline holds [assumed].'; } > "$d/spec.md"
+  nao "$CLI" validate "$c" > "$WORK/g" 2>&1
+  grep -q 'without an owner at spec.md:' "$WORK/g"
   cp "$FX/spec.md" "$d/spec.md"; sed 's/\[US1\] //' "$FX/tasks.md" > "$d/tasks.md"
   nao "$CLI" validate "$c" > "$WORK/g" 2>&1
   grep -q 'US1 has no task' "$WORK/g"
 }
 tp "critique with an invented quote fails" citacao_inventada
-tp "quote tolerates case, spaces and ellipses" citacao_folgada
+tp "quote tolerates case, spaces, ellipses and escaped quotes" citacao_folgada
 tp "veto against itself fails" veto_contra_si
 tp "missing Rn id fails" id_inexistente
 tp "proposal without an agenda position fails" proposta_sem_agenda
@@ -940,12 +948,98 @@ spec_reparo() {
     grep -q 'specs gate ok' "$c/raw/summary.log"
   )
 }
+# The agenda seats a catalog seat the brief words missed and a specialist made for the case: its persona is written
+# into the case, it proposes and critiques like any seat, and in opencode it runs as debate-specialist.
+agenda_semeia() {
+  c="$(novo_caso)"; log="$WORK/seat.log"; : > "$log"
+  STUB_LOG="$log" STUB_AGENDA=agenda-specialist.md SPECS=0 MODEL=stub/modelo "$CLI" run "$c" 3
+  p="$c/personas/debate-x-payments.md"
+  grep -q '^You are the payments engineer, a case specialist' "$p"
+  grep -q '^Must cover: chargeback, settlement\.$' "$p"
+  grep -q 'You open agenda decisions D2\.' "$p"
+  grep -q '^panel: debate-arch debate-ux debate-pm debate-x-payments debate-ai$' "$c/meta.txt"
+  grep -q 'panel: debate-x-payments seated by the agenda (payments engineer)' "$c/raw/summary.log"
+  grep -q 'panel: debate-ai seated by the agenda (catalog seat)' "$c/raw/summary.log"
+  existe "$c/proposals/debate-x-payments.md" "$c/proposals/debate-ai.md" "$c/critiques/debate-x-payments.md"
+  grep -q -- '--agent debate-specialist .*a case specialist' "$log"
+  "$CLI" gate "$c" proposal
+  "$CLI" status "$c" | grep -q '^proposal *ok 5/5'
+  # Redone from the agenda, the old seat leaves with it: the persona goes to the archive.
+  SPECS=0 MODEL=stub/modelo "$CLI" run "$c" 1 --from agenda
+  ausente "$c/personas"
+  grep -q '^panel: debate-arch debate-ux debate-pm debate-ai$' "$c/meta.txt"
+}
+seat_case() { c="$(caso_completo)"; cp "$FX/agenda-specialist.md" "$c/agenda.md"; printf '%s' "$c"; }
+agenda_assentos_reprovam() {
+  c="$(seat_case)"
+  "$CLI" gate "$c" agenda > "$WORK/g"
+  grep -q '^panel: .*debate-x-payments' "$WORK/g"
+  existe "$c/personas/debate-x-payments.md"
+  sed 's/| debate-x-payments | cost |/| debate-arch | cost |/' "$FX/agenda-specialist.md" > "$c/agenda.md"
+  reprova 'debate-x-payments owns no Dn' "$c" agenda
+  sed 's/| chargeback, settlement |/| chargeback |/' "$FX/agenda-specialist.md" > "$c/agenda.md"
+  reprova 'fewer than 2 Must cover' "$c" agenda
+  sed 's/debate-ai/debate-azure/g' "$FX/agenda-specialist.md" > "$c/agenda.md"
+  reprova 'debate-azure is neither' "$c" agenda
+  sed 's/debate-x-payments/debate-x-Pay_ments/g' "$FX/agenda-specialist.md" > "$c/agenda.md"
+  reprova 'owner outside the panel' "$c" agenda
+  { cat "$FX/agenda-specialist.md"; echo '| debate-x-fraud | fraud analyst | rules | velocity, device | brief |'; } \
+    | sed 's/| debate-ai | speed |/| debate-x-fraud | speed |/' > "$c/agenda.md"
+  reprova '3 seat(s) added, 2 free' "$c" agenda
+}
+especialista_cobre() {
+  c="$(seat_case)"; "$CLI" gate "$c" agenda > /dev/null
+  cp "$FX/proposal-specialist.md" "$c/proposals/debate-x-payments.md"
+  "$CLI" gate "$c" proposal debate-x-payments
+  sed 's/chargeback/dispute/g' "$FX/proposal-specialist.md" > "$c/proposals/debate-x-payments.md"
+  reprova 'does not cover chargeback' "$c" proposal debate-x-payments
+}
+painel_vagas() {
+  c="$(novo_caso)"
+  "$CLI" panel "$c" > "$WORK/p"
+  grep -q '^seats the agenda may add: 2$' "$WORK/p"
+  # A negation after a comma does not seat anyone; the choice is saved even when the reader closes the pipe early.
+  sed -i.bak 's/^- Platform[^:]*:.*/- Platform: responsive web app, no native app, without push/' "$c/brief.md"; rm -f "$c/brief.md.bak"
+  "$CLI" panel "$c" > "$WORK/p"
+  nao grep -q 'debate-mobile:' "$WORK/p"
+  grep -q 'debate-design: brief says "web"' "$WORK/p"
+  "$ROOT/template/skills/architect-debate/scripts/panel.sh" "$c" --save sec | head -1 > /dev/null
+  grep -q '^panel: debate-arch debate-ux debate-pm debate-sec$' "$c/meta.txt"
+}
+# Case files go inside the prompt: a call opens no file it was given, and a critique gets the rivals with line numbers.
+contexto_embutido() {
+  (
+    export PATH="$FAKE:$PATH"
+    c="$(novo_caso)"; log="$WORK/ctx.log"; : > "$log"
+    STUB_LOG="$log" SPECS=0 REVIEW=0 "$CLI" run "$c" --harness claude --rounds 2
+    grep 'phase proposal' "$log" | grep -q '<file path="brief.md">'
+    grep 'phase critique' "$log" | grep -q '<file path="proposals/debate-ux.md">      1	## Positions'
+    grep 'phase proposal' "$log" | grep -q -- '--tools Read,Glob,Grep,WebSearch,WebFetch --strict-mcp-config --disable-slash-commands --safe-mode'
+    # Past the 128 KiB of 1 argument, claude still gets every file: its prompt goes on stdin.
+    c="$(novo_caso)"; : > "$log"
+    awk 'BEGIN { for (i = 0; i < 2500; i++) print "filler line about clinics, deposits and reminders, number " i }' >> "$c/constitution.md"
+    STUB_LOG="$log" SPECS=0 REVIEW=0 "$CLI" run "$c" --harness claude --rounds 1
+    [ "$(wc -c < "$c/constitution.md")" -gt 131072 ]
+    grep 'phase proposal' "$log" | grep -q 'number 2499'
+    nao grep -q 'Not inlined' "$log"
+    c="$(novo_caso)"; : > "$log"
+    STUB_LOG="$log" STUB_OLD_HELP=1 INLINE=0 SPECS=0 REVIEW=0 "$CLI" run "$c" --harness claude --rounds 1
+    nao grep -q '<file path=' "$log"
+    nao grep -q -- '--strict-mcp-config' "$log"
+    nao grep -q -- '--safe-mode' "$log"
+  )
+}
 probe() {
   ( export PATH="$FAKE:$PATH"; for h in claude codex gemini; do "$ROOT/template/skills/architect-debate/scripts/probe.sh" "$h"; done )
 }
 for h in claude codex cursor gemini agy omp pi dsh droid copilot qwen cline; do tp "full protocol through $h" protocolo_em "$h"; done
 tp "panel with debate-sec" painel_com_sec
 tp "panel with a designer and an art director" painel_de_marca
+tp "agenda seats a catalog seat and a case specialist" agenda_semeia
+tp "agenda seat rows are checked" agenda_assentos_reprovam
+tp "case specialist covers its terms" especialista_cobre
+tp "panel shows the seats the agenda may add" painel_vagas
+tp "case files go inside the prompt, lean claude call" contexto_embutido
 tp "agents run in a room without rival output" sala_cega
 tp "429 limit waits and retries" limite_espera
 tp "auth failure does not retry" auth_nao_repete

@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Seats made for the idea. The agenda can add up to 2 seats (within the cap of 8) in a `## Specialists` table, each owning a contested decision: an optional catalog seat the brief words missed, or a specialist made for the case, `debate-x-<slug>`. A specialist gets `<case>/personas/<seat>.md` from `references/specialist-template.md` and has its `Must cover` terms checked in its proposal. In a session it runs as the new `debate-specialist` subagent; opencode headless calls also run it as `debate-specialist`, with the persona in the prompt. `panel.sh` prints how many seats the agenda may add, `gate.sh <case> agenda` seats them, and `--from agenda` archives the personas with the agenda.
+
+### Changed
+
+- Fewer tokens from the command line. Each call gets its case files inside the prompt and answers in 1 turn instead of opening them one at a time (measured: 6 turns down to 1, -47% input on a proposal). `INLINE=0` turns it off. Headless Claude Code runs with only the read and search tools, no MCP servers and no skills (measured: -93% input per turn on a machine with MCP servers), when the installed version has the flags.
+- Headless Claude Code also runs with `--safe-mode` and reads the prompt on stdin. The user's hooks no longer run inside a call: a Stop hook asking for one more turn had replaced research.md with its reply. Without the 128 KiB argument cap, a call inlines up to 320 KB.
+- In a session, subagents open all their files in 1 turn, in parallel, and never twice.
+
+### Fixed
+
+- The quote gate accepts inner quotes the model escaped (`\"...\"`), which failed 3 of 5 critiques in a real run.
+- An `[assumed]` without an owner fails the spec, decision, SDD, brand and backlog gates, so it gets a repair, instead of only failing `validate` after a run that reported ok.
+- A negation after a comma no longer seats anyone (`web app, no native app` seated debate-mobile).
+- `panel.sh --save` saves before printing, so `| head -1` does not lose the choice.
+- The agenda line cap is 24, for the seat rows.
+
 ## 0.6.0
 
 ### Added

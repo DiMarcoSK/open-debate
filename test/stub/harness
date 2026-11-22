@@ -7,33 +7,37 @@ real="$self"; [ ! -L "$self" ] || real="$(readlink "$self")"
 case "$real" in /*) ;; *) real="${self%/*}/$real" ;; esac
 FX="${real%/*}/../fixtures"
 nome="${self##*/}"; [ "$nome" != "harness" ] || { nome="$1"; shift; }
-[ -z "${STUB_LOG:-}" ] || { l_="$(printf '%s' "$*" | tr '\n' ' ')"; printf '%s %.2000s\n' "$nome" "$l_" >> "$STUB_LOG"; }
+# claude takes the prompt on stdin: it goes to the end of the arguments, as if passed there.
+if [ "$nome" = "claude" ] && [ "${1:-}" != "--help" ]; then entrada_="$(cat)"; [ -z "$entrada_" ] || set -- "$@" "$entrada_"; fi
+# --help: the flags a recent CLI lists, so the adapter takes its lean call (STUB_OLD_HELP=1: an old CLI without them).
+if [ "${1:-}" = "--help" ]; then [ -n "${STUB_OLD_HELP:-}" ] || echo '--tools <tools...> --strict-mcp-config --disable-slash-commands --safe-mode'; exit 0; fi
+[ -z "${STUB_LOG:-}" ] || { l_="$(printf '%s' "$*" | tr '\n' ' ')"; printf '%s %s\n' "$nome" "$l_" >> "$STUB_LOG"; }
 fim=""; p=""
 while [ "$#" -gt 0 ]; do
   case "$1" in -o) if [ "$nome" = "codex" ]; then fim="$2"; fi ;; esac
   case "$1" in *"## Task"*|"Reply with"*) p="$1" ;; esac
   shift
 done
-# Task: 1st non-empty line after "## Task". Role: the persona's 1st "You are the ..." line.
+# Task: 1st non-empty line after the last "## Task" (the inlined case files come before it). Role: the persona's 1st "You are the ..." line.
 tarefa=""; agente=""; depois=0
 while IFS= read -r l; do
   case "$l" in "You are the "*) [ -n "$agente" ] || agente="$l" ;; esac
   if [ "$depois" = 1 ] && [ -n "$l" ] && [ -z "$tarefa" ]; then tarefa="$l"; fi
-  case "$l" in "## Task"*) depois=1 ;; esac
+  case "$l" in "## Task"*) depois=1; tarefa="" ;; esac
 done <<EOF_P
 $p
 EOF_P
 [ -n "$tarefa" ] || tarefa="$p"
 case "$agente" in
   *"software product designer"*) short=design ;; *"UI and UX"*) short=ux ;; *"creative director"*) short=brand ;;
-  *"head of product"*) short=pm ;; *Kubernetes*) short=k8s ;; *security*) short=sec ;; *"GCP "*) short=gcp ;;
+  *"case specialist"*) short=specialist ;; *"head of product"*) short=pm ;; *Kubernetes*) short=k8s ;; *security*) short=sec ;; *"GCP "*) short=gcp ;;
   *"AWS "*) short=aws ;; *"data and analytics"*) short=data ;; *"AI engineer"*) short=ai ;; *mobile*) short=mobile ;;
   *) short=arch ;;
 esac
 case "$tarefa" in
   "phase research"*) f=research.md ;;
   "phase fact-check"*) f=research-check.md ;;
-  "phase agenda"*) f=agenda.md ;;
+  "phase agenda"*) f="${STUB_AGENDA:-agenda.md}" ;;
   "phase proposal"*) f="proposal-$short.md" ;;
   "phase critique"*) f=critique.md; [ "$short" = "ux" ] && f=critique-ux.md ;;
   "phase rebuttal"*) f=rebuttal.md ;;
@@ -57,7 +61,7 @@ else
   texto="$(cat "$FX/$f")"
   # A real critique targets a panel rival: the name comes from the task itself.
   if [ "$f" = "critique.md" ] || [ "$f" = "critique-ux.md" ]; then
-    r_="${tarefa#*proposals/debate-}"; rival="debate-${r_%%[!a-z0-9]*}"
+    r_="${tarefa#*proposals/debate-}"; rival="debate-${r_%%[!a-z0-9-]*}"
     texto="$(printf '%s\n' "$texto" | sed "s/debate-gcp/$rival/g")"
   fi
 fi
